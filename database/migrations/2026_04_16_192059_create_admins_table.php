@@ -11,10 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('artigos_palavras_chave', function (Blueprint $table) {
-            $table->foreignId('palavra_chave_id')->constrained('palavras_chave');
-            $table->foreignId('artigo_id')->constrained('artigos');
-            $table->primary(['palavras_chave_id', 'artigo_id']);
+        Schema::create('admins', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->timestamps();
         });
     }
 
@@ -23,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('artigos_palavras_chave');
+        Schema::dropIfExists('admins');
     }
 };
