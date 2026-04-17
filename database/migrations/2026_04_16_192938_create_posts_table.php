@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('postagens', function (Blueprint $table) {
+        Schema::create('posts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('publicacao_id')->constrained('publicacoes');
-            $table->integer('curtidas');
+            $table->foreignId('publication_id')->constrained('publications');
+            $table->unsignedInteger('likes')->default(0);
+            $table->timestamps();
         });
     }
 
@@ -23,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('postagens');
+        Schema::dropIfExists('posts');
     }
 };

@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('palavras_chave', function (Blueprint $table) {
+        Schema::create('articles', function (Blueprint $table) {
             $table->id();
-            $table->string('palavra');
+            $table->foreignId('publication_id')->constrained('publications');
+            $table->text('summary');
+            $table->timestamps();
         });
     }
 
@@ -22,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('palavras_chave');
+        Schema::dropIfExists('articles');
     }
 };

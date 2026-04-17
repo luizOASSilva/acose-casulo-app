@@ -11,10 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('documentos', function (Blueprint $table) {
+        Schema::create('publications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('administrador_id')->constrained('administradores');
-            $table->string('arquivo_url')->unique();
+            $table->foreignId('admin_id')->constrained('admins');
+            $table->string('title');
+            $table->text('content');
+            $table->string('image_url')->unique();
+            $table->string('image_description');
             $table->timestamps();
         });
     }
@@ -24,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('documentos');
+        Schema::dropIfExists('publications');
     }
 };
