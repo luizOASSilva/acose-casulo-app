@@ -6,7 +6,7 @@ use App\Models\Admin;
 use App\Models\Article;
 use App\Models\Document;
 use App\Models\Keyword;
-use App\Models\Post;
+use App\Models\Activity;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -28,7 +28,7 @@ class DatabaseSeeder extends Seeder
                 );
             });
 
-        Post::factory(5)->create();
+        Activity::factory(5)->create();
 
         Document::factory(5)->create([
             'admin_id' => Admin::first()->id,

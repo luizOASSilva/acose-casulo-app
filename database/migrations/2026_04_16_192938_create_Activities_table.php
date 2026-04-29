@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('posts', function (Blueprint $table) {
+        Schema::create('activities', function (Blueprint $table) {
             $table->id();
             $table->foreignId('publication_id')->constrained('publications')->cascadeOnDelete();
             $table->unsignedInteger('likes')->default(0);
@@ -24,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('posts');
+        Schema::dropIfExists('activities');
     }
 };

@@ -2,23 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StorePostRequest;
-use App\Http\Requests\UpdatePostRequest;
-use App\Http\Resources\PostResource;
+use App\Http\Requests\StoreActivityRequest;
+use App\Http\Requests\UpdateActivityRequest;
+use App\Http\Resources\ActivityResource;
+use App\Models\Activity;
 use App\Models\Media;
-use App\Models\Post;
 use App\Models\Publication;
 
-class PostController extends Controller
+class ActivityController extends Controller
 {
     public function index()
     {
-        return PostResource::collection(
-            Post::with('publication.media')->paginate()
+        return ActivityResource::collection(
+            Activity::with('publication.media')->paginate()
         );
     }
 
-    public function store(StorePostRequest $request)
+    public function store(StoreActivityRequest $request)
     {
         $media = Media::create([
             'url' => $request->image_url,
@@ -34,24 +34,24 @@ class PostController extends Controller
         ]);
 
         // 3. post
-        $post = Post::create([
+        $post = Activity::create([
             'likes' => $request->likes ?? 0,
             'publication_id' => $publication->id,
         ]);
 
         $post->load('publication.media');
 
-        return PostResource::make($post)->response()->setStatusCode(201);
+        return ActivityResource::make($post)->response()->setStatusCode(201);
     }
 
-    public function show(Post $post)
+    public function show(Activity $post)
     {
-        return PostResource::make(
+        return ActivityResource::make(
             $post->load('publication.media')
         );
     }
 
-    public function update(UpdatePostRequest $request, Post $post)
+    public function update(UpdateActivityRequest $request, Activity $post)
     {
         $post->load('publication.media');
 
@@ -69,12 +69,12 @@ class PostController extends Controller
             'likes' => $request->likes,
         ]);
 
-        return PostResource::make(
+        return ActivityResource::make(
             $post->load('publication.media')
         );
     }
 
-    public function destroy(Post $post)
+    public function destroy(Activity $post)
     {
         $post->load('publication.media');
 

@@ -5,7 +5,7 @@ namespace Database\Factories;
 use App\Models\Publication;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-class PostFactory extends Factory
+class ActivityFactory extends Factory
 {
     public function definition(): array
     {

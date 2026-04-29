@@ -4,12 +4,12 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\KeywordController;
-use App\Http\Controllers\PostController;
+use App\Http\Controllers\ActivityController;
 use Illuminate\Support\Facades\Route;
 
 $resources = [
     'articles' => ArticleController::class,
-    'posts' => PostController::class,
+    'activity' => ActivityController::class,
     'documents' => DocumentController::class,
     'keywords' => KeywordController::class,
 ];
