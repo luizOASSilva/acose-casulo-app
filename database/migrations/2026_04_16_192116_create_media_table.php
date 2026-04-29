@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('publications', function (Blueprint $table) {
+        Schema::create('media', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
-            $table->text('content');
-            $table->string('slug')->unique();
-            $table->foreignId('admin_id')->constrained('admins');
-            $table->foreignId('media_id')->nullable()->constrained('media')->nullOnDelete();
+            $table->string('url')->unique();
+            $table->string('alt_text')->nullable();
+            $table->string('caption')->nullable();
             $table->timestamps();
         });
     }
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('publications');
+        Schema::dropIfExists('media');
     }
 };

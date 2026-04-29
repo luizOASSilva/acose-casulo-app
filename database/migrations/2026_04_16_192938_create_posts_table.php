@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('publication_id')->constrained('publications');
+            $table->foreignId('publication_id')->constrained('publications')->cascadeOnDelete();
             $table->unsignedInteger('likes')->default(0);
             $table->timestamps();
         });
