@@ -15,7 +15,7 @@ class ArticleController extends Controller
     public function index()
     {
         return ArticleResource::collection(
-            Article::with('publication.media', 'keywords')->paginate()
+            Article::with('publication.media', 'publication.admin', 'keywords')->paginate()
         );
     }
 
@@ -57,13 +57,13 @@ class ArticleController extends Controller
     public function show(Article $article)
     {
         return ArticleResource::make(
-            $article->load('publication.media', 'keywords')
+            $article->load('publication.media', 'publication.admin', 'keywords')
         );
     }
 
     public function update(UpdateArticleRequest $request, Article $article)
     {
-        $article->load('publication');
+        $article->load('publication.media', 'publication.admin', 'keywords');
 
         $article->publication->media()->update([
             'url' => $request->image_url,
