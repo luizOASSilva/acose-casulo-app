@@ -2,22 +2,36 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Admin;
+use App\Models\Article;
+use App\Models\Document;
+use App\Models\Keyword;
+use App\Models\Post;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        Admin::factory()->create([
+            'name'  => 'Admin Test',
+            'email' => 'admin@test.com',
+        ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $keywords = Keyword::factory(10)->create();
+
+        Article::factory(5)
+            ->create()
+            ->each(function ($article) use ($keywords) {
+                $article->keywords()->attach(
+                    $keywords->random(rand(1, 4))->pluck('id')
+                );
+            });
+
+        Post::factory(5)->create();
+
+        Document::factory(5)->create([
+            'admin_id' => Admin::first()->id,
         ]);
     }
 }

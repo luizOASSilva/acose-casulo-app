@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
             $table->foreignId('admin_id')->constrained('admins');
+            $table->string('title');
             $table->string('file_url')->unique();
             $table->timestamps();
         });
