@@ -9,10 +9,13 @@ use Illuminate\Support\Facades\Route;
 
 $resources = [
     'articles' => ArticleController::class,
-    'activity' => ActivityController::class,
+    'activities' => ActivityController::class,
     'documents' => DocumentController::class,
     'keywords' => KeywordController::class,
 ];
+
+Route::get('/articles/recent', [ArticleController::class, 'recent']);
+Route::get('/activities/recent', [ActivityController::class, 'recent']);
 
 foreach($resources as $uri => $controller) {
     Route::apiResource($uri, $controller)->only(['index', 'show']);

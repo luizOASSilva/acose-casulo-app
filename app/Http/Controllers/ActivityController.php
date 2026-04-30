@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreActivityRequest;
-use App\Http\Requests\UpdateActivityRequest;
+use App\Http\Requests\Activity\StoreActivityRequest;
+use App\Http\Requests\Activity\UpdateActivityRequest;
 use App\Http\Resources\ActivityResource;
 use App\Models\Activity;
 use App\Models\Media;
@@ -15,6 +15,13 @@ class ActivityController extends Controller
     {
         return ActivityResource::collection(
             Activity::with('publication.media')->paginate()
+        );
+    }
+
+    public function recent()
+    {
+        return ActivityResource::collection(
+            Activity::with('publication.media')->latest()->take(9)->get()
         );
     }
 
@@ -33,7 +40,6 @@ class ActivityController extends Controller
             'media_id' => $media->id,
         ]);
 
-        // 3. post
         $post = Activity::create([
             'likes' => $request->likes ?? 0,
             'publication_id' => $publication->id,
@@ -44,11 +50,13 @@ class ActivityController extends Controller
         return ActivityResource::make($post)->response()->setStatusCode(201);
     }
 
-    public function show(Activity $post)
+    public function show(string $slug)
     {
-        return ActivityResource::make(
-            $post->load('publication.media')
-        );
+        $post = Activity::whereHas('publication', fn($q) => $q->where('slug', $slug))
+            ->with('publication.media')
+            ->firstOrFail();
+
+        return ActivityResource::make($post);
     }
 
     public function update(UpdateActivityRequest $request, Activity $post)
