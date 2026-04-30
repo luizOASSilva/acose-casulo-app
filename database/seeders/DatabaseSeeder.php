@@ -28,7 +28,7 @@ class DatabaseSeeder extends Seeder
                 );
             });
 
-        Activity::factory(5)->create();
+        Activity::factory(15)->create();
 
         Document::factory(5)->create([
             'admin_id' => Admin::first()->id,
