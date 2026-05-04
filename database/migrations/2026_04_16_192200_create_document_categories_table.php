@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('documents', function (Blueprint $table) {
+        Schema::create('document_categories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('admin_id')->constrained('admins');
-            $table->string('title');
-            $table->string('file_url')->unique();
-            $table->foreignId('category_id')->constrained('document_categories');
-            $table->integer('year');
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->boolean('featured')->default(false);
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('documents');
+        Schema::dropIfExists('document_categories');
     }
 };

@@ -15,14 +15,26 @@ class ArticleController extends Controller
     public function index()
     {
         return ArticleResource::collection(
-            Article::with(['publication.media', 'publication.admin', 'keywords'])->latest()->paginate(12)
+            Article::with([
+                'publication.media',
+                'publication.admin',
+                'keywords'
+            ])
+            ->latest()
+            ->paginate(12)
         );
     }
 
     public function recent()
     {
         return ArticleResource::collection(
-            Article::with('publication.media')->latest()->take(4)->get()
+            Article::with([
+                'publication.media',
+                'publication.admin'
+            ])
+            ->latest()
+            ->limit(4)
+            ->get()
         );
     }
 
@@ -47,18 +59,16 @@ class ArticleController extends Controller
         ]);
 
         if ($request->has('keywords')) {
-            $keywordIds = collect($request->keywords)->map(fn($word) =>
-                Keyword::firstOrCreate(['word' => $word])->id
+            $keywordIds = collect($request->keywords)->map(
+                fn ($word) => Keyword::firstOrCreate(['word' => $word])->id
             );
 
             $article->keywords()->attach($keywordIds);
         }
 
-        $article->load('publication.media', 'keywords');
-
-        return ArticleResource::make($article)
-            ->response()
-            ->setStatusCode(201);
+        return ArticleResource::make(
+            $article->load('publication.media', 'keywords')
+        )->response()->setStatusCode(201);
     }
 
     public function show(Article $article)
@@ -87,8 +97,8 @@ class ArticleController extends Controller
         ]);
 
         if ($request->has('keywords')) {
-            $keywordIds = collect($request->keywords)->map(fn   ($word) =>
-                Keyword::firstOrCreate(['word' => $word])->id
+            $keywordIds = collect($request->keywords)->map(
+                fn ($word) => Keyword::firstOrCreate(['word' => $word])->id
             );
 
             $article->keywords()->sync($keywordIds);

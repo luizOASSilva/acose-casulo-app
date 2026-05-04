@@ -14,14 +14,25 @@ class ActivityController extends Controller
     public function index()
     {
         return ActivityResource::collection(
-            Activity::with('publication.media')->paginate()
+            Activity::with([
+                'publication.media',
+                'publication.admin'
+            ])
+            ->latest()
+            ->paginate(12)
         );
     }
 
     public function recent()
     {
         return ActivityResource::collection(
-            Activity::with('publication.media')->latest()->take(9)->get()
+            Activity::with([
+                'publication.media',
+                'publication.admin'
+            ])
+            ->latest()
+            ->limit(9)
+            ->get()
         );
     }
 
@@ -40,53 +51,59 @@ class ActivityController extends Controller
             'media_id' => $media->id,
         ]);
 
-        $post = Activity::create([
+        $activity = Activity::create([
             'likes' => $request->likes ?? 0,
             'publication_id' => $publication->id,
         ]);
 
-        $post->load('publication.media');
-
-        return ActivityResource::make($post)->response()->setStatusCode(201);
+        return ActivityResource::make(
+            $activity->load('publication.media')
+        )->response()->setStatusCode(201);
     }
 
     public function show(string $slug)
     {
-        $post = Activity::whereHas('publication', fn($q) => $q->where('slug', $slug))
-            ->with('publication.media')
-            ->firstOrFail();
+        $activity = Activity::whereHas(
+            'publication',
+            fn ($q) => $q->where('slug', $slug)
+        )
+        ->with([
+            'publication.media',
+            'publication.admin'
+        ])
+        ->firstOrFail();
 
-        return ActivityResource::make($post);
+        return ActivityResource::make($activity);
     }
 
-    public function update(UpdateActivityRequest $request, Activity $post)
+    public function update(UpdateActivityRequest $request, Activity $activity)
     {
-        $post->load('publication.media');
+        $activity->load('publication.media');
 
-        $post->publication->media->update([
+        $activity->publication->media->update([
             'url' => $request->image_url,
             'alt_text' => $request->image_description,
         ]);
 
-        $post->publication->update([
+        $activity->publication->update([
             'title' => $request->title,
             'content' => $request->input('content'),
         ]);
 
-        $post->update([
+        $activity->update([
             'likes' => $request->likes,
         ]);
 
         return ActivityResource::make(
-            $post->load('publication.media')
+            $activity->load('publication.media')
         );
     }
 
-    public function destroy(Activity $post)
+    public function destroy(Activity $activity)
     {
-        $post->load('publication.media');
+        $activity->load('publication.media');
 
-        $post->publication->delete();
+        $activity->publication->delete();
 
         return response()->json(null, 204);
     }
