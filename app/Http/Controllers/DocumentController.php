@@ -9,45 +9,35 @@ use App\Models\Document;
 
 class DocumentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        return DocumentResource::collection(Document::paginate());
+        $documents = Document::with('category')
+            ->when(request('year'), fn ($q, $year) => $q->where('year', $year))
+            ->when(request('category_id'), fn ($q, $id) => $q->where('category_id', $id))
+            ->paginate();
+
+        return DocumentResource::collection($documents);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(StoreDocumentRequest $request)
     {
         $document = Document::create($request->validated());
 
-        return DocumentResource::make($document)->response()->setStatusCode(201);
+        return DocumentResource::make($document->load('category'))->response()->setStatusCode(201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Document $document)
     {
-        return DocumentResource::make($document);
+        return DocumentResource::make($document->load('category'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(UpdateDocumentRequest $request, Document $document)
     {
         $document->update($request->validated());
 
-        return DocumentResource::make($document);
+        return DocumentResource::make($document->load('category'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Document $document)
     {
         $document->delete();

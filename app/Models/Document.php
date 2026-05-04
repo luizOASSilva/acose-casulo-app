@@ -13,10 +13,17 @@ class Document extends Model
         'title',
         'file_url',
         'admin_id',
+        'category_id',
+        'year',
     ];
 
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(DocumentCategory::class);
     }
 }

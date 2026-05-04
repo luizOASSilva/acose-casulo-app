@@ -7,18 +7,19 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class DocumentResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'title' => $this->title,    
-            'file_url' => $this->file_url,
-            'created_at' => $this->created_at?->toIso8601String()
+            'id'         => $this->id,
+            'title'      => $this->title,
+            'file_url'   => $this->file_url,
+            'year'       => $this->year,
+            'category'   => [
+                'id'       => $this->category->id,
+                'name'     => $this->category->name,
+                'featured' => $this->category->featured,
+            ],
+            'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
 }
