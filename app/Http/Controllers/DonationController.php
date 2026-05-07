@@ -16,23 +16,28 @@ class DonationController extends Controller
 
     public function store(StoreDonationRequest $request): JsonResponse
     {
-        $data = $request->validated();
-
-        $donation = Donation::create([
-            ...$data,
-            'has_gift' => ($data['amount'] ?? 0) >= 100,
-            'status'   => Donation::STATUS_PENDING,
-        ]);
-
         try {
-            $this->mercadoPago->generatePix($donation);
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+            $data = $request->validated();
 
-        return response()->json($donation->only([
-            'id', 'amount', 'pix_copy_paste', 'pix_qr_code', 'pix_expires_at',
-        ]), 201);
+            $donation = Donation::create([
+                ...$data,
+                'has_gift' => ($data['amount'] ?? 0) >= 100,
+                'status'   => Donation::STATUS_PENDING,
+            ]);
+
+            $this->mercadoPago->generatePix($donation);
+
+            return response()->json($donation->only([
+                'id', 'amount', 'pix_copy_paste', 'pix_qr_code', 'pix_expires_at',
+            ]), 201);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error'   => $e->getMessage(),
+                'file'    => $e->getFile(),
+                'line'    => $e->getLine(),
+            ], 500);
+        }
     }
 
     public function update(UpdateDonationRequest $request, int $id): JsonResponse
