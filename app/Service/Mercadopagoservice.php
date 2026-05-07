@@ -8,15 +8,22 @@ use Illuminate\Support\Facades\Log;
 
 class MercadoPagoService
 {
-    private const API_URL = 'https://api.mercadopago.com/v1/payments';
+    private string $apiUrl;
+    private string $accessToken;
+
+    public function __construct()
+    {
+        $this->apiUrl       = config('services.mercadopago.api_url');
+        $this->accessToken  = config('services.mercadopago.access_token');
+    }
 
     public function generatePix(Donation $donation): void
     {
-        $response = Http::withToken(config('services.mercadopago.access_token'))
+        $response = Http::withToken($this->accessToken)
             ->withHeaders([
                 'X-Idempotency-Key' => "donation-{$donation->id}-{$donation->updated_at->timestamp}",
             ])
-            ->post(self::API_URL, [
+            ->post($this->apiUrl, [
                 'transaction_amount' => (float) $donation->amount,
                 'description'        => 'Doação ACOSE Casulo',
                 'payment_method_id'  => 'pix',
@@ -61,8 +68,8 @@ class MercadoPagoService
             return false;
         }
 
-        $response = Http::withToken(config('services.mercadopago.access_token'))
-            ->get(self::API_URL . "/{$paymentId}");
+        $response = Http::withToken($this->accessToken)
+            ->get("{$this->apiUrl}/{$paymentId}");
 
         if (!$response->successful()) {
             Log::warning('MercadoPago webhook: falha ao buscar pagamento', ['payment_id' => $paymentId]);
