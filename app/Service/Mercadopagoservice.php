@@ -13,8 +13,8 @@ class MercadoPagoService
 
     public function __construct()
     {
-        $this->apiUrl       = config('services.mercadopago.api_url');
-        $this->accessToken  = config('services.mercadopago.access_token');
+        $this->apiUrl      = config('services.mercadopago.api_url') ?? 'https://api.mercadopago.com/v1/payments';
+        $this->accessToken = config('services.mercadopago.access_token') ?? '';
     }
 
     public function generatePix(Donation $donation): void
@@ -45,7 +45,7 @@ class MercadoPagoService
                 'status'      => $response->status(),
                 'body'        => $response->json(),
             ]);
-            throw new \RuntimeException('Erro ao gerar PIX junto ao Mercado Pago.');
+            throw new \RuntimeException('Erro ao gerar PIX: ' . json_encode($response->json()));
         }
 
         $payment = $response->json();
