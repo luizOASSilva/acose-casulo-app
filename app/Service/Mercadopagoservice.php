@@ -19,9 +19,11 @@ class MercadoPagoService
 
     public function generatePix(Donation $donation): void
     {
+        $idempotencyKey = "donation_{$donation->id}_" . uniqid();
+
         $response = Http::withToken($this->accessToken)
             ->withHeaders([
-                'X-Idempotency-Key' => "donation-{$donation->id}-{$donation->updated_at->timestamp}",
+                'X-Idempotency-Key' => $idempotencyKey,
             ])
             ->post($this->apiUrl, [
                 'transaction_amount' => (float) $donation->amount,
@@ -45,15 +47,17 @@ class MercadoPagoService
                 'status'      => $response->status(),
                 'body'        => $response->json(),
             ]);
-            throw new \RuntimeException('Erro ao gerar PIX: ' . json_encode($response->json()));
+
+            $errorMsg = $response->json()['message'] ?? 'Erro desconhecido na API';
+            throw new \RuntimeException("Erro ao gerar PIX: {$errorMsg}");
         }
 
         $payment = $response->json();
-        $txData  = $payment['point_of_interaction']['transaction_data'] ?? [];
+        $txData = $payment['point_of_interaction']['transaction_data'] ?? [];
 
         $donation->update([
-            'payment_id'     => $payment['id'] ?? null,
-            'pix_copy_paste' => $txData['qr_code']        ?? null,
+            'payment_id'     => (string) ($payment['id'] ?? ''),
+            'pix_copy_paste' => $txData['qr_code'] ?? null,
             'pix_qr_code'    => $txData['qr_code_base64'] ?? null,
             'pix_expires_at' => now()->addMinutes(15),
             'status'         => Donation::STATUS_PENDING,
@@ -96,10 +100,12 @@ class MercadoPagoService
         }
 
         $newStatus = match ($status) {
-            'approved'      => Donation::STATUS_APPROVED,
+            'approved'          => Donation::STATUS_APPROVED,
             'cancelled',
-            'refunded'      => Donation::STATUS_CANCELLED,
-            default         => null,
+            'refunded',
+            'rejected'          => Donation::STATUS_CANCELLED,
+            'expired'           => Donation::STATUS_EXPIRED,
+            default             => null,
         };
 
         if ($newStatus) {
