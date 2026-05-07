@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Donation;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class MercadoPagoService
 {
@@ -19,7 +20,9 @@ class MercadoPagoService
 
     public function generatePix(Donation $donation): void
     {
-        $idempotencyKey = "donation_{$donation->id}_" . uniqid();
+        $idempotencyKey = "donation_{$donation->id}_" . time();
+        $expiration = now()->addMinutes(30);
+        $formattedDate = $expiration->format('Y-m-d\TH:i:s.vP');
 
         $response = Http::withToken($this->accessToken)
             ->withHeaders([
@@ -29,7 +32,7 @@ class MercadoPagoService
                 'transaction_amount' => (float) $donation->amount,
                 'description'        => 'Doação ACOSE Casulo',
                 'payment_method_id'  => 'pix',
-                'date_of_expiration' => now()->addMinutes(15)->toIso8601String(),
+                'date_of_expiration' => $formattedDate,
                 'payer'              => [
                     'email'          => $donation->email,
                     'first_name'     => $donation->name,
@@ -48,7 +51,13 @@ class MercadoPagoService
                 'body'        => $response->json(),
             ]);
 
-            $errorMsg = $response->json()['message'] ?? 'Erro desconhecido na API';
+            $errorData = $response->json();
+            $errorMsg = $errorData['message'] ?? 'Erro desconhecido na API';
+
+            if (isset($errorData['cause'][0]['description'])) {
+                $errorMsg .= " - " . $errorData['cause'][0]['description'];
+            }
+
             throw new \RuntimeException("Erro ao gerar PIX: {$errorMsg}");
         }
 
@@ -59,8 +68,9 @@ class MercadoPagoService
             'payment_id'     => (string) ($payment['id'] ?? ''),
             'pix_copy_paste' => $txData['qr_code'] ?? null,
             'pix_qr_code'    => $txData['qr_code_base64'] ?? null,
-            'pix_expires_at' => now()->addMinutes(15),
+            'pix_expires_at' => $expiration,
             'status'         => Donation::STATUS_PENDING,
+            'updated_at'     => now(),
         ]);
     }
 
@@ -68,15 +78,12 @@ class MercadoPagoService
     {
         $paymentId = $payload['data']['id'] ?? null;
 
-        if (!$paymentId) {
-            return false;
-        }
+        if (!$paymentId) return false;
 
         $response = Http::withToken($this->accessToken)
             ->get("{$this->apiUrl}/{$paymentId}");
 
         if (!$response->successful()) {
-            Log::warning('MercadoPago webhook: falha ao buscar pagamento', ['payment_id' => $paymentId]);
             return false;
         }
 
@@ -84,35 +91,25 @@ class MercadoPagoService
         $status  = $payment['status'] ?? null;
         $extRef  = $payment['external_reference'] ?? null;
 
-        if (!$extRef) {
-            return false;
-        }
+        if (!$extRef) return false;
 
         $donation = Donation::find((int) $extRef);
 
-        if (!$donation) {
-            Log::warning('MercadoPago webhook: doação não encontrada', ['external_reference' => $extRef]);
-            return false;
-        }
-
-        if ($donation->isApproved()) {
+        if (!$donation || $donation->status === Donation::STATUS_APPROVED) {
             return true;
         }
 
         $newStatus = match ($status) {
-            'approved'          => Donation::STATUS_APPROVED,
-            'cancelled',
-            'refunded',
-            'rejected'          => Donation::STATUS_CANCELLED,
-            'expired'           => Donation::STATUS_EXPIRED,
-            default             => null,
+            'approved' => Donation::STATUS_APPROVED,
+            'cancelled', 'refunded', 'rejected' => Donation::STATUS_CANCELLED,
+            'expired' => Donation::STATUS_EXPIRED,
+            default => null,
         };
 
         if ($newStatus) {
-            $donation->update(['status' => $newStatus]);
-            Log::info('Donation status updated via webhook', [
-                'donation_id' => $donation->id,
-                'status'      => $newStatus,
+            $donation->update([
+                'status' => $newStatus,
+                'updated_at' => now()
             ]);
         }
 

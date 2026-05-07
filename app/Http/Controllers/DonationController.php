@@ -33,9 +33,7 @@ class DonationController extends Controller
 
         } catch (\Throwable $e) {
             return response()->json([
-                'error'   => $e->getMessage(),
-                'file'    => $e->getFile(),
-                'line'    => $e->getLine(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -67,13 +65,14 @@ class DonationController extends Controller
             'amount' => ['required', 'numeric', 'min:1', 'max:50000'],
         ]);
 
-        if ($donation->updated_at->gt(now()->subSeconds(5))) {
+        if ($donation->updated_at && $donation->updated_at->gt(now()->subSeconds(10))) {
             return response()->json(['message' => 'Aguarde alguns segundos antes de gerar um novo PIX.'], 429);
         }
 
         $donation->update([
-            'amount'   => $data['amount'],
-            'has_gift' => $data['amount'] >= 100,
+            'amount'     => $data['amount'],
+            'has_gift'   => $data['amount'] >= 100,
+            'updated_at' => now(),
         ]);
 
         try {
@@ -103,11 +102,13 @@ class DonationController extends Controller
 
     public function webhook(Request $request): JsonResponse
     {
+        Log::info('MercadoPago Webhook', ['payload' => $request->all()]);
+
         $secret    = config('services.mercadopago.webhook_secret');
         $signature = $request->header('x-signature', '');
         $requestId = $request->header('x-request-id', '');
 
-        if ($secret) {
+        if ($secret && $signature) {
             [$ts, $hash] = $this->parseSignature($signature);
             $expected = hash_hmac(
                 'sha256',
@@ -116,7 +117,6 @@ class DonationController extends Controller
             );
 
             if (!hash_equals($expected, $hash)) {
-                Log::warning('MercadoPago webhook: assinatura inválida');
                 return response()->json(['message' => 'Forbidden'], 403);
             }
         }
