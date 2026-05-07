@@ -33,8 +33,9 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
-    ],
         'mercadopago' => [
-        'access_token' => env('MERCADOPAGO_ACCESS_TOKEN_TESTE'),
+            'access_token'   => env('MERCADOPAGO_ACCESS_TOKEN'),
+            'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+        ],
     ],
 ];

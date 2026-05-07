@@ -3,134 +3,152 @@
 namespace App\Http\Controllers;
 
 use App\Models\Donation;
-use App\Http\Requests\Donation\StoreDonationRequest;
+use App\Services\MercadoPagoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class DonationController extends Controller
 {
-    /**
-     * Recupera o Token de Acesso das configurações.
-     */
-    private function getToken(): string
+    public function __construct(private readonly MercadoPagoService $mercadoPago) {}
+
+    public function store(Request $request): JsonResponse
     {
-        return config('services.mercadopago.access_token');
-    }
-
-    /**
-     * Cria uma doação e gera o pagamento PIX no Mercado Pago.
-     */
-    public function store(StoreDonationRequest $request): JsonResponse
-    {
-        $token = $this->getToken();
-
-        // Regra de negócio para brinde
-        $hasGift = $request->amount >= 100;
-
-        // 1. Persiste a doação no banco de dados local
-        $donation = Donation::create([
-            'amount'       => $request->amount,
-            'has_gift'     => $hasGift,
-            'gift_status'  => $hasGift ? 'pending' : null,
-            'name'         => $request->name,
-            'email'        => $request->email,
-            'phone'        => $request->phone,
-            'zip_code'     => $request->zip_code,
-            'street'       => $request->street,
-            'number'       => $request->number,
-            'complement'   => $request->complement,
-            'neighborhood' => $request->neighborhood,
-            'city'         => $request->city,
-            'state'        => $request->state,
+        $data = $request->validate([
+            'amount'       => ['required', 'numeric', 'min:1', 'max:50000'],
+            'name'         => ['required', 'string', 'max:255'],
+            'email'        => ['required', 'email', 'max:255'],
+            'cpf'          => ['required', 'string', 'min:11', 'max:14'],
+            'zip_code'     => ['nullable', 'string', 'max:9'],
+            'city'         => ['nullable', 'string', 'max:100'],
+            'street'       => ['nullable', 'string', 'max:255'],
+            'number'       => ['nullable', 'string', 'max:20'],
+            'neighborhood' => ['nullable', 'string', 'max:100'],
+            'state'        => ['nullable', 'string', 'max:2'],
+            'size'         => ['nullable', Rule::in(['PP', 'P', 'M', 'G', 'GG', '3G'])],
         ]);
 
-        // 2. Chamada à API do Mercado Pago
-        $response = Http::withToken($token)
-            ->withHeaders([
-                'X-Idempotency-Key' => Str::uuid()->toString(),
-            ])
-            ->post('https://api.mercadopago.com/v1/payments', [
-                'transaction_amount' => (float) $request->amount,
-                'description'        => 'Doação Acose Casulo - TESTE',
-                'payment_method_id'  => 'pix',
-                'payer' => [
-                    'email' => 'comprador_externo_deteste@gmail.com',
-                    'first_name' => 'Comprador',
-                    'last_name'  => 'Teste',
-                    'identification' => [
-                        'type' => 'CPF',
-                        'number' => '19100000000' // CPF padrão de teste
-                    ],
-                ],
-                'external_reference' => (string) $donation->id,
-            ]);
+        $donation = Donation::create([
+            ...$data,
+            'has_gift' => ($data['amount'] ?? 0) >= 100,
+            'status'   => Donation::STATUS_PENDING,
+        ]);
 
-        if (!$response->successful()) {
-            $donation->delete();
+        $this->mercadoPago->generatePix($donation);
 
-            return response()->json([
-                'error'   => 'Mercado Pago error',
-                'details' => $response->json(),
-            ], 422);
+        return response()->json($donation->only([
+            'id', 'amount', 'pix_copy_paste', 'pix_qr_code', 'pix_expires_at',
+        ]), 201);
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $donation = Donation::findOrFail($id);
+
+        if ($donation->isApproved()) {
+            return response()->json(['message' => 'Pagamento já aprovado.'], 400);
         }
 
-        $payment = $response->json();
+        $data = $request->validate([
+            'name'         => ['sometimes', 'string', 'max:255'],
+            'email'        => ['sometimes', 'email', 'max:255'],
+            'cpf'          => ['sometimes', 'string', 'min:11', 'max:14'],
+            'zip_code'     => ['sometimes', 'nullable', 'string', 'max:9'],
+            'city'         => ['sometimes', 'nullable', 'string', 'max:100'],
+            'street'       => ['sometimes', 'nullable', 'string', 'max:255'],
+            'number'       => ['sometimes', 'nullable', 'string', 'max:20'],
+            'neighborhood' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'state'        => ['sometimes', 'nullable', 'string', 'max:2'],
+            'size'         => ['sometimes', 'nullable', Rule::in(['PP', 'P', 'M', 'G', 'GG', '3G'])],
+        ]);
+
+        $donation->update($data);
+
+        return response()->json($donation->only([
+            'id', 'name', 'email', 'cpf', 'updated_at',
+        ]));
+    }
+
+    public function updatePix(Request $request, int $id): JsonResponse
+    {
+        $donation = Donation::findOrFail($id);
+
+        if ($donation->isApproved()) {
+            return response()->json(['message' => 'Pagamento já aprovado.'], 400);
+        }
+
+        $data = $request->validate([
+            'amount' => ['required', 'numeric', 'min:1', 'max:50000'],
+        ]);
+
+        if ($donation->updated_at->gt(now()->subSeconds(5))) {
+            return response()->json(['message' => 'Aguarde alguns segundos antes de gerar um novo PIX.'], 429);
+        }
 
         $donation->update([
-            'payment_id' => $payment['id'] ?? null,
-            'pix_copy_paste' => $payment['point_of_interaction']['transaction_data']['qr_code'] ?? null,
-            'pix_qr_code' => $payment['point_of_interaction']['transaction_data']['qr_code_base64'] ?? null,
+            'amount'   => $data['amount'],
+            'has_gift' => $data['amount'] >= 100,
         ]);
 
-        return response()->json([
-            'id'             => $donation->id,
-            'amount'         => $donation->amount,
-            'pix_copy_paste' => $donation->pix_copy_paste,
-            'pix_qr_code'    => $donation->pix_qr_code,
-        ], 201);
+        $this->mercadoPago->generatePix($donation);
+
+        return response()->json($donation->only([
+            'id', 'amount', 'pix_copy_paste', 'pix_qr_code', 'pix_expires_at',
+        ]));
     }
 
-    /**
-     * Recebe notificações de alteração de status do Mercado Pago.
-     */
+    public function status(int $id): JsonResponse
+    {
+        $donation = Donation::findOrFail($id);
+
+        if ($donation->isPending() && $donation->isExpired()) {
+            $donation->markExpired();
+        }
+
+        return response()->json([
+            'status'         => $donation->status,
+            'pix_expires_at' => $donation->pix_expires_at?->toIso8601String(),
+        ]);
+    }
+
     public function webhook(Request $request): JsonResponse
     {
-        if ($request->input('type') !== 'payment' && $request->input('action') !== 'payment.created') {
-            return response()->json(['ok' => true]);
-        }
+        $secret    = config('services.mercadopago.webhook_secret');
+        $signature = $request->header('x-signature', '');
+        $requestId = $request->header('x-request-id', '');
 
-        $paymentId = $request->input('data.id') ?? $request->input('id');
+        if ($secret) {
+            [$ts, $hash] = $this->parseSignature($signature);
+            $expected = hash_hmac(
+                'sha256',
+                "id={$request->input('data.id')}&request-id={$requestId}&ts={$ts}",
+                $secret
+            );
 
-        if (!$paymentId) {
-            return response()->json(['ok' => true]);
-        }
-
-        $token = $this->getToken();
-
-        $response = Http::withToken($token)
-            ->get("https://api.mercadopago.com/v1/payments/{$paymentId}");
-
-        if ($response->successful()) {
-            $paymentData = $response->json();
-
-            $donation = Donation::where('payment_id', $paymentId)
-                ->orWhere('id', $paymentData['external_reference'] ?? null)
-                ->first();
-
-            if ($donation) {
-                $donation->update([
-                    'status' => $paymentData['status'] ?? null,
-                ]);
-
-                // Se aprovado, você pode disparar eventos ou e-mails aqui
-                if (($paymentData['status'] ?? null) === 'approved') {
-                    // Log::info("Doação {$donation->id} aprovada.");
-                }
+            if (!hash_equals($expected, $hash)) {
+                Log::warning('MercadoPago webhook: assinatura inválida');
+                return response()->json(['message' => 'Forbidden'], 403);
             }
         }
 
-        return response()->json(['ok' => true]);
+        try {
+            $this->mercadoPago->handleWebhook($request->all());
+        } catch (\Throwable $e) {
+
+            Log::error('Webhook processing error', ['error' => $e->getMessage()]);
+        }
+
+        return response()->json(['message' => 'ok']);
+    }
+
+    private function parseSignature(string $signature): array
+    {
+        $parts = [];
+        foreach (explode(',', $signature) as $part) {
+            [$k, $v] = array_pad(explode('=', trim($part), 2), 2, '');
+            $parts[$k] = $v;
+        }
+        return [$parts['ts'] ?? '', $parts['v1'] ?? ''];
     }
 }
