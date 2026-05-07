@@ -33,9 +33,10 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
-        'mercadopago' => [
-            'access_token'   => env('MERCADOPAGO_ACCESS_TOKEN'),
-            'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
-        ],
+    ],
+    'mercadopago' => [
+        'access_token'   => env('MERCADOPAGO_ACCESS_TOKEN'),
+        'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+        'api_url'      => env('MERCADOPAGO_API_URL', 'https://api.mercadopago.com/v1/payments'),
     ],
 ];
