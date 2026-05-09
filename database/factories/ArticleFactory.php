@@ -10,7 +10,7 @@ class ArticleFactory extends Factory
     public function definition(): array
     {
         return [
-            'summary' => fake()->paragraph(3),
+            'summary' => fake()->text(160),
             'publication_id' => Publication::factory(),
         ];
     }
