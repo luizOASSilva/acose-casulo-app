@@ -51,6 +51,7 @@ class StoreArticleRequest extends FormRequest
             'summary' => [
                 'required',
                 'string',
+                'max:160',
             ],
 
             'keywords' => [

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('articles', function (Blueprint $table) {
             $table->id();
             $table->foreignId('publication_id')->constrained('publications')->cascadeOnDelete();
-            $table->text('summary');
+            $table->string('summary', 169);
             $table->timestamps();
         });
     }

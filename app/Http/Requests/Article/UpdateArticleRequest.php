@@ -51,6 +51,7 @@ class UpdateArticleRequest extends FormRequest
             'summary' => [
                 'sometimes',
                 'string',
+                'max:160'
             ],
 
             'keywords' => [
