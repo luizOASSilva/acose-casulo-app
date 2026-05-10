@@ -11,7 +11,7 @@ class PublicationFactory extends Factory
     public function definition(): array
     {
         return [
-            'title' => fake()->sentence(6),
+            'title' => fake()->sentence(4),
             'content' => fake()->paragraphs(4, true),
             'admin_id' => Admin::factory(),
             'media_id' => Media::factory(),
