@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('publications', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
+            $table->string('title', 51);
             $table->text('content');
             $table->string('slug')->unique();
             $table->foreignId('admin_id')->constrained('admins');

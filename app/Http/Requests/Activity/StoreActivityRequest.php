@@ -28,7 +28,7 @@ class StoreActivityRequest extends FormRequest
                 'required',
                 'string',
                 'min:3',
-                'max:255',
+                'max:51',
             ],
 
             'content' => [

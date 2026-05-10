@@ -28,7 +28,7 @@ class UpdateArticleRequest extends FormRequest
                 'sometimes',
                 'string',
                 'min:3',
-                'max:255',
+                'max:51php',
             ],
 
             'content' => [
