@@ -54,9 +54,6 @@ Route::middleware('auth:sanctum')->group(function () use ($resources) {
     Route::apiResource('admins', AdminController::class);
 });
 
-Route::get('/limpar-tudo', function () {
-    \Illuminate\Support\Facades\Artisan::call('config:clear');
-    \Illuminate\Support\Facades\Artisan::call('cache:clear');
-    \Illuminate\Support\Facades\Artisan::call('route:clear');
-    return response()->json(['message' => 'Cache limpo no Railway!']);
+Route::get('/donations/{id}/debug', function ($id) {
+    return \App\Models\Donation::findOrFail($id)->only(['id', 'status', 'payment_id', 'pix_expires_at']);
 });
