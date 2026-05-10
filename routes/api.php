@@ -53,3 +53,7 @@ Route::middleware('auth:sanctum')->group(function () use ($resources) {
 
     Route::apiResource('admins', AdminController::class);
 });
+
+Route::get('/donations/{id}/debug', function ($id) {
+    return \App\Models\Donation::findOrFail($id)->only(['id', 'status', 'payment_id', 'pix_expires_at']);
+});
