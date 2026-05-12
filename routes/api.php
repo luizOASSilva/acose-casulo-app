@@ -8,12 +8,16 @@ use App\Http\Controllers\KeywordController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DonationController;
 use App\Http\Controllers\TransparencyController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/auth/login',  [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::get('/auth/me',      [AuthController::class, 'me'])->middleware('auth:sanctum');
 
 Route::get('/articles/recent',    [ArticleController::class,  'recent']);
 Route::get('/activities/recent',  [ActivityController::class, 'recent']);
 Route::get('/transparency',       [TransparencyController::class, 'index']);
-
 
 Route::post('/donations',               [DonationController::class, 'store'])
     ->middleware('throttle:10,1');
@@ -52,8 +56,4 @@ Route::middleware('auth:sanctum')->group(function () use ($resources) {
         ->only(['store', 'update', 'destroy']);
 
     Route::apiResource('admins', AdminController::class);
-});
-
-Route::get('/donations/latest/debug', function () {
-    return \App\Models\Donation::latest()->first()->only(['id', 'status', 'payment_id', 'pix_expires_at']);
 });
