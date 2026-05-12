@@ -42,7 +42,7 @@ class StoreAdminRequest extends FormRequest
                 'string',
                 'min:8',
                 'confirmed',
-            ]
+            ],
         ];
     }
 }

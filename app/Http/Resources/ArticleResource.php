@@ -14,9 +14,9 @@ class ArticleResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-         return [
+        return [
             'id' => $this->id,
-            'slug'    => $this->publication?->slug,
+            'slug' => $this->publication?->slug,
             'author' => [
                 'name' => $this->publication?->admin?->name,
             ],
@@ -24,7 +24,7 @@ class ArticleResource extends JsonResource
             'title' => $this->publication?->title,
             'content' => $this->publication?->content,
             'media' => MediaResource::make($this->publication?->media),
-            'keywords' => $this->whenLoaded('keywords', fn() => $this->keywords->pluck('word'), []),
+            'keywords' => $this->whenLoaded('keywords', fn () => $this->keywords->pluck('word'), []),
             'created_at' => $this->publication?->created_at?->toIso8601String(),
         ];
     }

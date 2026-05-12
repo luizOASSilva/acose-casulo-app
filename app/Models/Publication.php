@@ -13,6 +13,7 @@ class Publication extends Model
 {
     use HasFactory;
     use HasSlug;
+
     protected $fillable = [
         'title',
         'content',

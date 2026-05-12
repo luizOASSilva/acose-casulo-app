@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class Donation extends Model
 {
-    const STATUS_PENDING   = 'pending';
-    const STATUS_APPROVED  = 'approved';
-    const STATUS_EXPIRED   = 'expired';
+    const STATUS_PENDING = 'pending';
+
+    const STATUS_APPROVED = 'approved';
+
+    const STATUS_EXPIRED = 'expired';
+
     const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -36,8 +39,8 @@ class Donation extends Model
     ];
 
     protected $casts = [
-        'amount'         => 'decimal:2',
-        'has_gift'       => 'boolean',
+        'amount' => 'decimal:2',
+        'has_gift' => 'boolean',
         'pix_expires_at' => 'datetime',
     ];
 

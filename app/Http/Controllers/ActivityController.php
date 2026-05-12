@@ -16,10 +16,10 @@ class ActivityController extends Controller
         return ActivityResource::collection(
             Activity::with([
                 'publication.media',
-                'publication.admin'
+                'publication.admin',
             ])
-            ->latest()
-            ->paginate(12)
+                ->latest()
+                ->paginate(12)
         );
     }
 
@@ -28,11 +28,11 @@ class ActivityController extends Controller
         return ActivityResource::collection(
             Activity::with([
                 'publication.media',
-                'publication.admin'
+                'publication.admin',
             ])
-            ->latest()
-            ->limit(9)
-            ->get()
+                ->latest()
+                ->limit(9)
+                ->get()
         );
     }
 
@@ -67,11 +67,11 @@ class ActivityController extends Controller
             'publication',
             fn ($q) => $q->where('slug', $slug)
         )
-        ->with([
-            'publication.media',
-            'publication.admin'
-        ])
-        ->firstOrFail();
+            ->with([
+                'publication.media',
+                'publication.admin',
+            ])
+            ->firstOrFail();
 
         return ActivityResource::make($activity);
     }

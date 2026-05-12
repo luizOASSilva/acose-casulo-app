@@ -11,7 +11,7 @@ class TransparencyController extends Controller
     {
         $year = request('year');
 
-        if (!$year) {
+        if (! $year) {
             $year = Document::max('year') ?? now()->year;
         }
 
@@ -21,17 +21,17 @@ class TransparencyController extends Controller
             ->pluck('year');
 
         $categories = DocumentCategory::with([
-            'documents' => fn ($q) =>
-                $q->where('year', $year)->orderBy('title')
+            'documents' => fn ($q) => $q->where('year', $year)->orderBy('title'),
         ])
-        ->orderBy('order')
-        ->get()
-        ->map(function ($category) {
-            $category->documents = $category->documents->values();
-            return $category;
-        })
-        ->filter(fn ($c) => $c->documents->isNotEmpty())
-        ->values();
+            ->orderBy('order')
+            ->get()
+            ->map(function ($category) {
+                $category->documents = $category->documents->values();
+
+                return $category;
+            })
+            ->filter(fn ($c) => $c->documents->isNotEmpty())
+            ->values();
 
         $featured = $categories->firstWhere('featured', true);
 

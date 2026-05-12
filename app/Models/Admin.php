@@ -9,21 +9,22 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class Admin extends Authenticatable
 {
     use HasFactory;
+
     protected $fillable = [
         'name',
         'email',
-        'password'
+        'password',
     ];
 
     protected $hidden = [
         'password',
-        'remember_token'
+        'remember_token',
     ];
 
     protected function casts(): array
     {
         return [
-            'password' => 'hashed'
+            'password' => 'hashed',
         ];
     }
 

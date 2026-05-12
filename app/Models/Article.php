@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Article extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'summary',
         'publication_id',
@@ -18,8 +19,8 @@ class Article extends Model
     public function resolveRouteBinding($value, $field = null): ?self
     {
         return $this->whereHas('publication', function ($query) use ($value) {
-                $query->where('slug', $value);
-            })
+            $query->where('slug', $value);
+        })
             ->with('publication.media', 'keywords')
             ->firstOrFail();
     }

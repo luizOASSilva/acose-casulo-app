@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Keyword extends Model
 {
     use HasFactory;
+
     protected $fillable = ['word'];
+
     public function articles(): BelongsToMany
     {
         return $this->belongsToMany(Article::class);

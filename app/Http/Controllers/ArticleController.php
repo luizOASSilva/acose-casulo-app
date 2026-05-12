@@ -18,10 +18,10 @@ class ArticleController extends Controller
             Article::with([
                 'publication.media',
                 'publication.admin',
-                'keywords'
+                'keywords',
             ])
-            ->latest()
-            ->paginate(12)
+                ->latest()
+                ->paginate(12)
         );
     }
 
@@ -30,11 +30,11 @@ class ArticleController extends Controller
         return ArticleResource::collection(
             Article::with([
                 'publication.media',
-                'publication.admin'
+                'publication.admin',
             ])
-            ->latest()
-            ->limit(4)
-            ->get()
+                ->latest()
+                ->limit(4)
+                ->get()
         );
     }
 

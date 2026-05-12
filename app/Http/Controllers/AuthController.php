@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Admin;
 use App\Http\Resources\AdminResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,11 +13,11 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        if (!Auth::guard('admin')->attempt($request->only('email', 'password'))) {
+        if (! Auth::guard('admin')->attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages([
                 'email' => ['Credenciais inválidas.'],
             ]);

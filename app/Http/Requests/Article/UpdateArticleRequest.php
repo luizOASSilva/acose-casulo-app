@@ -4,7 +4,6 @@ namespace App\Http\Requests\Article;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateArticleRequest extends FormRequest
 {
@@ -51,7 +50,7 @@ class UpdateArticleRequest extends FormRequest
             'summary' => [
                 'sometimes',
                 'string',
-                'max:160'
+                'max:160',
             ],
 
             'keywords' => [

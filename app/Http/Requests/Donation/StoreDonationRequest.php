@@ -71,7 +71,7 @@ class StoreDonationRequest extends FormRequest
                 $hasGift ? 'required' : 'nullable',
                 'string',
                 'size:2',
-            ]
+            ],
         ];
     }
 }

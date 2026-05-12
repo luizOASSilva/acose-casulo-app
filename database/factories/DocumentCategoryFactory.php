@@ -9,10 +9,10 @@ class DocumentCategoryFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'        => fake()->words(3, true),
+            'name' => fake()->words(3, true),
             'description' => fake()->optional()->sentence(),
-            'featured'    => false,
-            'order'       => fake()->numberBetween(1, 10),
+            'featured' => false,
+            'order' => fake()->numberBetween(1, 10),
         ];
     }
 }

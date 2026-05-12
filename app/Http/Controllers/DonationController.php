@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Donation;
 use App\Http\Requests\Donation\StoreDonationRequest;
-use App\Http\Requests\Donation\UpdateDonationRequest;
+use App\Models\Donation;
 use App\Services\MercadoPagoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

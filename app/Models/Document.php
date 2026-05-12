@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Document extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'title',
         'file_url',

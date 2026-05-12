@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Log;
  */
 class ExpirePendingDonations extends Command
 {
-    protected $signature   = 'donations:expire';
+    protected $signature = 'donations:expire';
+
     protected $description = 'Marca como expiradas doações pendentes com PIX vencido';
 
     public function handle(): int
