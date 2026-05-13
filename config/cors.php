@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'login', 'logout', 'sanctum/csrf-cookie', 'donations'],
+    'paths' => ['api/*', 'auth/*', 'login', 'logout', 'sanctum/csrf-cookie', 'donations'],
     'allowed_methods' => ['*'],
     'allowed_origins' => ['https://luizoassilva.xyz'],
     'allowed_headers' => ['*'],
