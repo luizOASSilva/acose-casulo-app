@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\AdminResource;
+use App\Models\Admin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -17,37 +18,32 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $credentials = $request->only('email', 'password');
+        $admin = Admin::where('email', $request->email)->first();
 
-        if (! Auth::guard('admin')->attempt($credentials)) {
+        if (! $admin || ! Hash::check($request->password, $admin->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Credenciais inválidas.'],
             ]);
         }
 
-        $request->session()->regenerate();
+        $token = $admin->createToken('admin-panel')->plainTextToken;
 
         return response()->json([
-            'user' => new AdminResource(Auth::guard('admin')->user()),
+            'user' => AdminResource::make($admin),
+            'token' => $token,
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        Auth::guard('admin')->logout();
+        $request->user()->currentAccessToken()->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return response()->json([
-            'message' => 'Logout realizado com sucesso.',
-        ]);
+        return response()->json(['message' => 'Logout realizado com sucesso.']);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(
-            new AdminResource(Auth::guard('admin')->user())
-        );
+        return response()->json(AdminResource::make($request->user()));
     }
 }
+
