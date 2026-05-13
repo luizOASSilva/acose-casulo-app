@@ -17,30 +17,37 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($request->only('email', 'password'))) {
+        $credentials = $request->only('email', 'password');
+
+        if (! Auth::guard('admin')->attempt($credentials)) {
             throw ValidationException::withMessages([
                 'email' => ['Credenciais inválidas.'],
             ]);
         }
 
-        $admin = Auth::user();
-        $token = $admin->createToken('admin-panel', ['*'], now()->addHours(8))->plainTextToken;
+        $request->session()->regenerate();
 
         return response()->json([
-            'user' => AdminResource::make($admin),
-            'token' => $token,
+            'user' => new AdminResource(Auth::guard('admin')->user()),
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::guard('admin')->logout();
 
-        return response()->json(['message' => 'Logout realizado com sucesso.']);
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json([
+            'message' => 'Logout realizado com sucesso.',
+        ]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(AdminResource::make($request->user()));
+        return response()->json(
+            new AdminResource(Auth::guard('admin')->user())
+        );
     }
 }
