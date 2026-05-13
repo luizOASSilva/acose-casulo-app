@@ -9,6 +9,7 @@ return [
         'logout',
         'donations',
         'donations/*',
+        'webhook/*',
     ],
 
     'allowed_methods' => ['*'],
@@ -16,8 +17,6 @@ return [
     'allowed_origins' => [
         'https://luizoassilva.xyz',
     ],
-
-    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
