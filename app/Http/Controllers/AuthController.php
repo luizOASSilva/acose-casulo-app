@@ -24,7 +24,7 @@ class AuthController extends Controller
         }
 
         $admin = Auth::user();
-        $token = $admin->createToken('admin-panel')->plainTextToken;
+        $token = $admin->createToken('admin-panel', ['*'], now()->addHours(8))->plainTextToken;
 
         return response()->json([
             'user' => AdminResource::make($admin),
