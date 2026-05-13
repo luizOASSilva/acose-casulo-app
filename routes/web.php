@@ -1,8 +1,7 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
-Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+Route::get('/{any}', function () {
+    return response()->json(['message' => 'Not Found'], 404);
+})->where('any', '.*');
