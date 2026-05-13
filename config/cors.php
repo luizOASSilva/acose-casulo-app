@@ -5,16 +5,17 @@ return [
     'paths' => [
         'api/*',
         'sanctum/csrf-cookie',
+        'auth/*',
         'login',
         'logout',
-        'auth/*',
+        'donations',
+        'donations/*',
     ],
 
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
         'https://luizoassilva.xyz',
-        'https://api.luizoassilva.xyz',
     ],
 
     'allowed_origins_patterns' => [],
