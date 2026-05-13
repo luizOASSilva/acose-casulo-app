@@ -7,7 +7,7 @@ return [
     ],
     'allowed_methods' => ['*'],
     'allowed_origins' => [
-        'https://acose-casulo-web.vercel.app',
+        'https://luizoassilva.xyz',
         'http://localhost:3000',
     ],
     'allowed_origins_patterns' => [],
