@@ -36,4 +36,8 @@ jobs:
 
       - name: Tests
         run: ./vendor/bin/pest
-        
+        timeout-minutes: 5
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+          
