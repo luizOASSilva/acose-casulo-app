@@ -26,24 +26,27 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $admin->createToken('admin-panel')->plainTextToken;
+        $request->session()->regenerate();
 
         return response()->json([
             'user' => AdminResource::make($admin),
-            'token' => $token,
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        return response()->json(['message' => 'Logout realizado com sucesso.']);
+        return response()->json([
+            'message' => 'Logout realizado com sucesso.',
+        ]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(AdminResource::make($request->user()));
+        return response()->json(
+            AdminResource::make($request->user())
+        );
     }
 }
-

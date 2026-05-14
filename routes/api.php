@@ -14,30 +14,14 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 
-Route::post('/auth/logout', [AuthController::class, 'logout'])
-    ->middleware('auth:sanctum');
-
-Route::get('/auth/me', [AuthController::class, 'me'])
-    ->middleware('auth:sanctum');
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+});
 
 Route::get('/articles/recent', [ArticleController::class, 'recent']);
 Route::get('/activities/recent', [ActivityController::class, 'recent']);
 Route::get('/transparency', [TransparencyController::class, 'index']);
-
-Route::post('/donations', [DonationController::class, 'store'])
-    ->middleware('throttle:10,1');
-
-Route::put('/donations/{id}', [DonationController::class, 'update'])
-    ->middleware('throttle:30,1');
-
-Route::put('/donations/{id}/pix', [DonationController::class, 'updatePix'])
-    ->middleware('throttle:10,1');
-
-Route::get('/donations/{id}/status', [DonationController::class, 'status'])
-    ->middleware('throttle:120,1');
-
-Route::post('/webhook/mercadopago', [DonationController::class, 'webhook']);
-
 
 Route::apiResource('articles', ArticleController::class)
     ->only(['index', 'show']);
@@ -53,6 +37,20 @@ Route::apiResource('keywords', KeywordController::class)
 
 Route::apiResource('document-categories', DocumentCategoryController::class)
     ->only(['index', 'show']);
+
+Route::post('/donations', [DonationController::class, 'store'])
+    ->middleware('throttle:10,1');
+
+Route::put('/donations/{id}', [DonationController::class, 'update'])
+    ->middleware('throttle:30,1');
+
+Route::put('/donations/{id}/pix', [DonationController::class, 'updatePix'])
+    ->middleware('throttle:10,1');
+
+Route::get('/donations/{id}/status', [DonationController::class, 'status'])
+    ->middleware('throttle:120,1');
+
+Route::post('/webhook/mercadopago', [DonationController::class, 'webhook']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -73,4 +71,3 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('document-categories', DocumentCategoryController::class)
         ->only(['store', 'update', 'destroy']);
 });
-
