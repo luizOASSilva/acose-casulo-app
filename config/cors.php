@@ -16,6 +16,8 @@ return [
 
     'allowed_origins' => [
         'https://luizoassilva.xyz',
+        'https://acose-casulo-58kv5ok32-luizoassilvas-projects.vercel.app',
+        'https://*.vercel.app',
     ],
 
     'allowed_headers' => ['*'],
