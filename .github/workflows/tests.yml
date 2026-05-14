@@ -2,28 +2,21 @@ name: tests
 
 on:
   push:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
+    branches: [develop, main, master, workos]
   pull_request:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
+    branches: [develop, main, master, workos]
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        php-version: '8.4'
+        php-version: [8.3]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -33,9 +26,9 @@ jobs:
           coverage: xdebug
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
 
       - name: Install Node Dependencies
         run: npm i
