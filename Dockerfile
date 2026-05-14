@@ -27,6 +27,7 @@ RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/start.sh /start.sh
+COPY docker/ca.pem /etc/ssl/certs/aiven-ca.pem
 RUN chmod +x /start.sh
 
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
