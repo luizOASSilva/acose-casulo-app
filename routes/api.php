@@ -11,6 +11,14 @@ use App\Http\Controllers\KeywordController;
 use App\Http\Controllers\TransparencyController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/debug', function () {
+    return response()->json([
+        'guard' => config('auth.defaults.guard'),
+        'guards' => array_keys(config('auth.guards')),
+        'session_driver' => config('session.driver'),
+    ]);
+});
+
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 
