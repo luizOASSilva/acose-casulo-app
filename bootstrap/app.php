@@ -27,9 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->shouldRenderJsonWhen(fn ($request) => true);
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('donations:prune')->everyFiveMinutes();
     })
     ->create();
+    
