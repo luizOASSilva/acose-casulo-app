@@ -6,6 +6,7 @@ use App\Http\Resources\AdminResource;
 use App\Models\Admin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -26,6 +27,7 @@ class AuthController extends Controller
             ]);
         }
 
+        Auth::guard('web')->login($admin);
         $request->session()->regenerate();
 
         return response()->json([
@@ -35,6 +37,7 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
@@ -45,10 +48,6 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        \Log::info('me() iniciado');
-        \Log::info('default guard: ' . config('auth.defaults.guard'));
-        \Log::info('guards config: ' . json_encode(config('auth.guards')));
-
         return response()->json(
             AdminResource::make($request->user())
         );
