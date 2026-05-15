@@ -2,9 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
-// Controllers Públicos e de Admin
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\AdminController;
+use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DocumentController;
