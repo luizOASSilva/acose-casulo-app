@@ -15,13 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-
         $middleware->trustProxies(at: '*');
-
-        $middleware->api(prepend: [
+        $middleware->api(append: [
             EnsureFrontendRequestsAreStateful::class,
         ]);
-
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
@@ -30,3 +27,4 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('donations:prune')->everyFiveMinutes();
     })
     ->create();
+
