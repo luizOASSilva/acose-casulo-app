@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\AdminResource;
-use App\Models\Admin;
+use App\Http\Resources\Admin\AdminResource;
+use App\Models\Admin\Admin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

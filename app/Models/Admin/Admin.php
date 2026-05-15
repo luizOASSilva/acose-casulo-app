@@ -29,6 +29,11 @@ class Admin extends Authenticatable
         ];
     }
 
+    public function partners(): HasMany
+    {
+        return $this->hasMany(Partner::class);
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);

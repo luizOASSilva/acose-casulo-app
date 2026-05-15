@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Admin\StoreAdminRequest;
 use App\Http\Requests\Admin\UpdateAdminRequest;
-use App\Http\Resources\AdminResource;
-use App\Models\Admin;
+use App\Http\Resources\Admin\AdminResource;
+use App\Models\Admin\Admin;
 use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
