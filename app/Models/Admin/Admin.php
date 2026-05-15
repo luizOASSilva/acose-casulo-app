@@ -31,17 +31,16 @@ class Admin extends Authenticatable
 
     public function partners(): HasMany
     {
-        return $this->hasMany(Partner::class);
+        return $this->hasMany(Partner::class, 'admin_id');
     }
 
     public function documents(): HasMany
     {
-        return $this->hasMany(Document::class);
+        return $this->hasMany(Document::class, 'admin_id');
     }
 
     public function publications(): HasMany
     {
-        return $this->hasMany(Publication::class);
+        return $this->hasMany(Publication::class, 'admin_id');
     }
 }
-

@@ -25,7 +25,6 @@ class PartnerController extends Controller
             $data['logo_path'] = $request->file('logo')->store('partners', 'public');
         }
 
-        // Criando através da relação definida no model Admin
         $partner = $request->user()->partners()->create($data);
 
         return new PartnerResource($partner);

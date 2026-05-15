@@ -11,7 +11,7 @@ class Partner extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
+        'admin_id',
         'name',
         'logo_path',
         'website_url',
@@ -24,8 +24,8 @@ class Partner extends Model
         'is_active' => 'boolean',
     ];
 
-    public function user(): BelongsTo
+    public function admin(): BelongsTo
     {
-        return $this->belongsTo(Admin::class);
+        return $this->belongsTo(Admin::class, 'admin_id');
     }
 }
