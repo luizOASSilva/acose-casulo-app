@@ -45,6 +45,10 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        \Log::info('me() iniciado');
+        \Log::info('default guard: ' . config('auth.defaults.guard'));
+        \Log::info('guards config: ' . json_encode(config('auth.guards')));
+
         return response()->json(
             AdminResource::make($request->user())
         );
