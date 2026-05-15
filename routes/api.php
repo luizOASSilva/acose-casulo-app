@@ -55,7 +55,7 @@ Route::post('/webhook/mercadopago', [DonationController::class, 'webhook']);
 |--------------------------------------------------------------------------
 | Protegidas por Cookies HttpOnly via Sanctum.
 */
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:admin')->group(function () {
 
     // Dashboard - Central de estatísticas
     Route::get('/dashboard', [DashboardController::class, 'index']);
