@@ -35,6 +35,9 @@ COPY composer.json composer.lock ./
 # Instala as dependências
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
+# Verifica se o pacote foi instalado
+RUN ls vendor/google/ && echo "Google packages OK"
+
 # Copia o resto do projeto
 COPY . .
 
