@@ -46,7 +46,7 @@ class DashboardController extends Controller
 
     private function getAnalyticsData(): array
     {
-        $client = new BetaAnalyticsDataClient(['credentials' => storage_path('app/private/google-analytics.json')]);
+        $client = new BetaAnalyticsDataClient(['credentials' => storage_path('/etc/secrets/google-analytics.json')]);
         $propertyId = env('GA4_PROPERTY_ID');
 
         $response = $client->runReport([
