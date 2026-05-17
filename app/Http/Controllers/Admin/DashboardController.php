@@ -74,6 +74,7 @@ class DashboardController extends Controller
                 'conversion' => number_format($today[2]->getValue(), 1),
             ];
         } catch (\Throwable $e) {
+            \Log::error('Analytics error: ' . $e->getMessage());
             return [
                 'visitors' => 0,
                 'growth' => '0%',
