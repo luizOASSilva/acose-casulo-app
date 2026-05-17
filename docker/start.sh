@@ -10,6 +10,8 @@ chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 ln -sf /dev/stdout /var/www/html/storage/logs/laravel.log
 
+composer install --no-dev --optimize-autoloader
+
 php artisan config:clear
 php artisan cache:clear
 php artisan view:clear
