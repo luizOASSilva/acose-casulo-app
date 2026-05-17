@@ -36,15 +36,24 @@ class DashboardController extends Controller
             ],
             'status' => [
                 'api' => 'Online',
-                'analytics' => 'Ativo',
+                'analytics' => class_exists('\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient') ? 'Ativo' : 'Indisponível',
             ]
         ]);
     }
 
     private function getAnalyticsData(): array
     {
+        if (!class_exists('\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient')) {
+            \Log::warning('Google Analytics SDK não está instalado no vendor.');
+            return $this->defaultAnalyticsData();
+        }
+
         try {
-            $client = new \Google\Analytics\Data\V1beta\BetaAnalyticsDataClient([
+            $clientClass = '\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient';
+            $dateRangeClass = '\Google\Analytics\Data\V1beta\DateRange';
+            $metricClass = '\Google\Analytics\Data\V1beta\Metric';
+
+            $client = new $clientClass([
                 'credentials' => '/etc/secrets/google-analytics.json'
             ]);
 
@@ -53,13 +62,13 @@ class DashboardController extends Controller
             $response = $client->runReport([
                 'property' => 'properties/' . $propertyId,
                 'dateRanges' => [
-                    new \Google\Analytics\Data\V1beta\DateRange(['start_date' => 'today', 'end_date' => 'today']),
-                    new \Google\Analytics\Data\V1beta\DateRange(['start_date' => 'yesterday', 'end_date' => 'yesterday']),
+                    new $dateRangeClass(['start_date' => 'today', 'end_date' => 'today']),
+                    new $dateRangeClass(['start_date' => 'yesterday', 'end_date' => 'yesterday']),
                 ],
                 'metrics' => [
-                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'activeUsers']),
-                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'screenPageViews']),
-                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'conversions']),
+                    new $metricClass(['name' => 'activeUsers']),
+                    new $metricClass(['name' => 'screenPageViews']),
+                    new $metricClass(['name' => 'conversions']),
                 ],
             ]);
 
@@ -75,13 +84,18 @@ class DashboardController extends Controller
             ];
         } catch (\Throwable $e) {
             \Log::error('Analytics error: ' . $e->getMessage());
-            return [
-                'visitors' => 0,
-                'growth' => '0%',
-                'pageviews' => 0,
-                'conversion' => '0.0',
-            ];
+            return $this->defaultAnalyticsData();
         }
+    }
+
+    private function defaultAnalyticsData(): array
+    {
+        return [
+            'visitors' => 0,
+            'growth' => '0%',
+            'pageviews' => 0,
+            'conversion' => '0.0',
+        ];
     }
 
     private function calculateGrowth($current, $previous): string
