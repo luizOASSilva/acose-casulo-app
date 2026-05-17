@@ -11,6 +11,7 @@ return [
         'donations',
         'donations/*',
         'webhook/*',
+        'dashboard',
     ],
 
     'allowed_methods' => ['*'],
