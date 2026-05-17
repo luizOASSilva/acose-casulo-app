@@ -7,9 +7,6 @@ use App\Models\Donation;
 use App\Models\Article;
 use App\Models\Partner;
 use Illuminate\Http\JsonResponse;
-use Google\Analytics\Data\V1beta\BetaAnalyticsDataClient;
-use Google\Analytics\Data\V1beta\DateRange;
-use Google\Analytics\Data\V1beta\Metric;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -46,31 +43,44 @@ class DashboardController extends Controller
 
     private function getAnalyticsData(): array
     {
-        $client = new BetaAnalyticsDataClient(['credentials' => storage_path('/etc/secrets/google-analytics.json')]);
-        $propertyId = env('GA4_PROPERTY_ID');
+        try {
+            $client = new \Google\Analytics\Data\V1beta\BetaAnalyticsDataClient([
+                'credentials' => '/etc/secrets/google-analytics.json'
+            ]);
 
-        $response = $client->runReport([
-            'property' => 'properties/' . $propertyId,
-            'dateRanges' => [
-                new DateRange(['start_date' => 'yesterday', 'end_date' => 'today']),
-            ],
-            'metrics' => [
-                new Metric(['name' => 'activeUsers']),
-                new Metric(['name' => 'screenPageViews']),
-                new Metric(['name' => 'conversions']),
-            ],
-        ]);
+            $propertyId = env('GA4_PROPERTY_ID');
 
-        $rows = $response->getRows();
-        $today = $rows[0]->getMetricValues();
-        $yesterday = isset($rows[1]) ? $rows[1]->getMetricValues() : $today;
+            $response = $client->runReport([
+                'property' => 'properties/' . $propertyId,
+                'dateRanges' => [
+                    new \Google\Analytics\Data\V1beta\DateRange(['start_date' => 'today', 'end_date' => 'today']),
+                    new \Google\Analytics\Data\V1beta\DateRange(['start_date' => 'yesterday', 'end_date' => 'yesterday']),
+                ],
+                'metrics' => [
+                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'activeUsers']),
+                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'screenPageViews']),
+                    new \Google\Analytics\Data\V1beta\Metric(['name' => 'conversions']),
+                ],
+            ]);
 
-        return [
-            'visitors' => $today[0]->getValue(),
-            'growth' => $this->calculateGrowth($today[0]->getValue(), $yesterday[0]->getValue()) . '%',
-            'pageviews' => $today[1]->getValue(),
-            'conversion' => number_format($today[2]->getValue(), 1),
-        ];
+            $rows = $response->getRows();
+            $today = $rows[0]->getMetricValues();
+            $yesterday = isset($rows[1]) ? $rows[1]->getMetricValues() : $today;
+
+            return [
+                'visitors' => $today[0]->getValue(),
+                'growth' => $this->calculateGrowth($today[0]->getValue(), $yesterday[0]->getValue()) . '%',
+                'pageviews' => $today[1]->getValue(),
+                'conversion' => number_format($today[2]->getValue(), 1),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'visitors' => 0,
+                'growth' => '0%',
+                'pageviews' => 0,
+                'conversion' => '0.0',
+            ];
+        }
     }
 
     private function calculateGrowth($current, $previous): string
