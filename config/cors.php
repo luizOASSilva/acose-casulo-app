@@ -20,6 +20,7 @@ return [
         'https://luizoassilva.xyz',
         'https://api.luizoassilva.xyz',
         'https://acose-casulo-58kv5ok32-luizoassilvas-projects.vercel.app',
+        'https://acose-casulo-web-luizoassilvas-projects.vercel.app/'
     ],
 
     'allowed_origins_patterns' => [
