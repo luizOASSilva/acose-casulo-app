@@ -36,63 +36,21 @@ class DashboardController extends Controller
             ],
             'status' => [
                 'api' => 'Online',
-                'analytics' => class_exists('\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient') ? 'Ativo' : 'Indisponível',
+                'analytics' => 'Indisponível',
             ]
         ]);
     }
 
     private function getAnalyticsData(): array
     {
-        if (!class_exists('\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient')) {
-            \Log::warning('Google Analytics SDK não está instalado no vendor.');
-            return $this->defaultAnalyticsData();
-        }
-
-        try {
-            $clientClass = '\Google\Analytics\Data\V1beta\BetaAnalyticsDataClient';
-            $dateRangeClass = '\Google\Analytics\Data\V1beta\DateRange';
-            $metricClass = '\Google\Analytics\Data\V1beta\Metric';
-
-            $client = new $clientClass([
-                'credentials' => '/etc/secrets/google-analytics.json'
-            ]);
-
-            $propertyId = env('GA4_PROPERTY_ID');
-
-            $response = $client->runReport([
-                'property' => 'properties/' . $propertyId,
-                'dateRanges' => [
-                    new $dateRangeClass(['start_date' => 'today', 'end_date' => 'today']),
-                    new $dateRangeClass(['start_date' => 'yesterday', 'end_date' => 'yesterday']),
-                ],
-                'metrics' => [
-                    new $metricClass(['name' => 'activeUsers']),
-                    new $metricClass(['name' => 'screenPageViews']),
-                    new $metricClass(['name' => 'conversions']),
-                ],
-            ]);
-
-            $rows = $response->getRows();
-            $today = $rows[0]->getMetricValues();
-            $yesterday = isset($rows[1]) ? $rows[1]->getMetricValues() : $today;
-
-            return [
-                'visitors' => $today[0]->getValue(),
-                'growth' => $this->calculateGrowth($today[0]->getValue(), $yesterday[0]->getValue()) . '%',
-                'pageviews' => $today[1]->getValue(),
-                'conversion' => number_format($today[2]->getValue(), 1),
-            ];
-        } catch (\Throwable $e) {
-            \Log::error('Analytics error: ' . $e->getMessage());
-            return $this->defaultAnalyticsData();
-        }
+        return $this->defaultAnalyticsData();
     }
 
     private function defaultAnalyticsData(): array
     {
         return [
             'visitors' => 0,
-            'growth' => '0%',
+            'growth' => '0',
             'pageviews' => 0,
             'conversion' => '0.0',
         ];
