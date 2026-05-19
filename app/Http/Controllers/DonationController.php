@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Donation\StoreDonationRequest;
+use App\Http\Resources\Admin\DonationResource;
 use App\Models\Donation;
 use App\Services\MercadoPagoService;
 use Illuminate\Http\JsonResponse;
@@ -47,7 +48,17 @@ class DonationController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function getPendingDonations(Request $request) {
-        return Donation::where(['status' -> 'pending'])->get();
+    public function index(Request $request): JsonResponse
+    {
+        $donations = Donation::query()
+            ->when(
+                $request->status,
+                fn($q) => $q->where('status', $request->status),
+                fn($q) => $q->whereIn('status', ['pending', 'approved'])
+            )
+            ->latest()
+            ->paginate(20);
+
+        return DonationResource::collection($donations)->response();
     }
 }

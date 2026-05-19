@@ -77,6 +77,6 @@ Route::middleware('auth:admin')->group(function () {
     // Gestão de Parceiros (Dashboard)
     Route::apiResource('partners', PartnerController::class)->except(['index']);
 
-    // Gestão de Doações (Edição/Atualização)
-    Route::put('/donations/{id}', [DonationController::class, 'update'])->middleware('throttle:30,1');
+    // Visualização de doações
+    Route::get('/donations', [DonationController::class, 'index']);
 });
