@@ -17,5 +17,7 @@ php artisan route:clear
 php artisan migrate --force
 php artisan config:cache
 
+(while true; do php artisan schedule:run; sleep 60; done) &
+
 php-fpm -D
 nginx -g "daemon off;"
