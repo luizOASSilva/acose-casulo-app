@@ -31,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(fn ($request) => true);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('donations:prune')->everyFiveMinutes();
+        $schedule->command('donations:expire')->everyFiveMinutes();
     })
     ->create();
 

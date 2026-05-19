@@ -52,8 +52,15 @@ class DonationController extends Controller
     {
         $donations = Donation::query()
             ->when(
-                $request->status,
-                fn($q) => $q->where('status', $request->status),
+                $request->status === 'has_gift',
+                fn($q) => $q->whereIn('status', ['pending', 'approved'])->where('has_gift', true)
+            )
+            ->when(
+                $request->status && $request->status !== 'has_gift',
+                fn($q) => $q->where('status', $request->status)
+            )
+            ->when(
+                !$request->status,
                 fn($q) => $q->whereIn('status', ['pending', 'approved'])
             )
             ->latest()

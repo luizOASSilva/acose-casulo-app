@@ -56,7 +56,7 @@ class Donation extends Model
 
     public function scopePixExpired(Builder $q): Builder
     {
-        return $q->pending()->where('pix_expires_at', '<', now());
+        return $q->pending()->where('pix_expires_at', '<', now()->subMinutes(2));
     }
 
     public function isApproved(): bool
