@@ -46,4 +46,8 @@ class DonationController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    public function getPendingDonations(Request $request) {
+        return Donation::where(['status' -> 'pending'])->get();
+    }
 }
