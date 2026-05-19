@@ -77,6 +77,6 @@ Route::middleware('auth:admin')->group(function () {
     // Gestão de Parceiros (Dashboard)
     Route::apiResource('partners', PartnerController::class)->except(['index']);
 
-    // Visualização de doações
-    Route::get('/donations', [DonationController::class, 'index']);
 });
+
+Route::get('/donations', [DonationController::class, 'index']);
