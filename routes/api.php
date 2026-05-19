@@ -75,7 +75,7 @@ Route::middleware('auth:admin')->group(function () {
     Route::apiResource('document-categories', DocumentCategoryController::class)->only(['store', 'update', 'destroy']);
 
     // Gestão de Parceiros (Dashboard)
-    Route::apiResource('partners', PartnerController::class)->except(['index']);
+    Route::apiResource('partners', PartnerController::class)->only(['store', 'update', 'destroy']);
 
 });
 
