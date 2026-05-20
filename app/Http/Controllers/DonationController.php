@@ -50,7 +50,7 @@ class DonationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $donations = Donation::query()
+        $query = Donation::query()
             ->when(
                 $request->status === 'has_gift',
                 fn($q) => $q->whereIn('status', ['pending', 'approved'])->where('has_gift', true)
@@ -62,10 +62,32 @@ class DonationController extends Controller
             ->when(
                 !$request->status,
                 fn($q) => $q->whereIn('status', ['pending', 'approved'])
-            )
+            );
+
+        $donations = $query
             ->latest()
             ->paginate(20);
 
-        return DonationResource::collection($donations)->response();
+        return response()->json([
+            'data' => DonationResource::collection($donations->items()),
+
+            'meta' => [
+                'current_page' => $donations->currentPage(),
+                'last_page' => $donations->lastPage(),
+                'per_page' => $donations->perPage(),
+                'total' => $donations->total(),
+            ],
+
+            'stats' => [
+                'total_raised' => Donation::where('status', 'approved')
+                    ->sum('amount'),
+
+                'approved_count' => Donation::where('status', 'approved')
+                    ->count(),
+
+                'pending_count' => Donation::where('status', 'pending')
+                    ->count(),
+            ],
+        ]);
     }
 }
