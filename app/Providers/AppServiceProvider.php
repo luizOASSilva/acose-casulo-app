@@ -33,13 +33,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Date::use(CarbonImmutable::class);
 
-        // Temporariamente liberado para rodar:
-        // php artisan migrate:fresh --seed --force
-        //
-        // Depois que rodar uma vez no Render, volte essa linha:
-        // DB::prohibitDestructiveCommands(app()->isProduction());
-
-        DB::prohibitDestructiveCommands(false);
+        DB::prohibitDestructiveCommands(
+            app()->isProduction(),
+        );
 
         Password::defaults(fn (): ?Password => app()->isProduction()
             ? Password::min(12)
@@ -52,4 +48,3 @@ class AppServiceProvider extends ServiceProvider
         );
     }
 }
-
