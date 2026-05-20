@@ -15,8 +15,8 @@ php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
 
-echo "Rodando migrations normais..."
-php artisan migrate --force
+echo "Recriando banco e rodando seed..."
+php artisan migrate:fresh --seed --force
 
 php artisan config:cache
 
