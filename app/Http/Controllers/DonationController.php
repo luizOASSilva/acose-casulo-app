@@ -54,30 +54,18 @@ class DonationController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Donation::query()
-            ->when(
-                $request->status === 'has_gift',
-                fn($q) => $q
-                    ->whereIn('status', ['pending', 'approved'])
-                    ->where('has_gift', true)
-            )
-            ->when(
-                $request->status && $request->status !== 'has_gift',
-                fn($q) => $q->where('status', $request->status)
-            )
-            ->when(
-                !$request->status,
-                fn($q) => $q->whereIn('status', ['pending', 'approved'])
-            );
+        $query = Donation::query();
 
-        $donations = $query
-            ->latest()
-            ->paginate(20);
+        if ($request->has('status') && $request->status !== 'has_gift') {
+            $query->where('status', $request->status);
+        } elseif ($request->status === 'has_gift') {
+            $query->where('has_gift', true);
+        }
+
+        $donations = $query->latest()->paginate(20);
 
         return response()->json([
-            'data' => DonationResource::collection(
-                $donations->items()
-            ),
+            'data' => DonationResource::collection($donations->items()),
 
             'meta' => [
                 'current_page' => $donations->currentPage(),
@@ -87,25 +75,10 @@ class DonationController extends Controller
             ],
 
             'stats' => [
-                'total_raised' => Donation::where(
-                    'status',
-                    'approved'
-                )->sum('amount'),
-
-                'approved_count' => Donation::where(
-                    'status',
-                    'approved'
-                )->count(),
-
-                'pending_count' => Donation::where(
-                    'status',
-                    'pending'
-                )->count(),
-
-                'gifts_count' => Donation::where(
-                    'has_gift',
-                    true
-                )->count(),
+                'total_raised' => Donation::where('status', 'approved')->sum('amount'),
+                'approved_count' => Donation::where('status', 'approved')->count(),
+                'pending_count' => Donation::where('status', 'pending')->count(),
+                'gifts_count' => Donation::where('has_gift', true)->count(),
             ],
         ]);
     }
