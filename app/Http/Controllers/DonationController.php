@@ -12,9 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 class DonationController extends Controller
 {
-    public function __construct(
-        private readonly MercadoPagoService $mercadoPago
-    ) {}
+    public function __construct(private readonly MercadoPagoService $mercadoPago) {}
 
     public function store(StoreDonationRequest $request): JsonResponse
     {
@@ -47,19 +45,31 @@ class DonationController extends Controller
             Log::error($e->getMessage());
         }
 
-        return response()->json([
-            'ok' => true,
-        ]);
+        return response()->json(['ok' => true]);
     }
 
     public function index(Request $request): JsonResponse
     {
+        $activeStatuses = [
+            Donation::STATUS_PENDING,
+            Donation::STATUS_APPROVED,
+        ];
+
         $query = Donation::query();
 
-        if ($request->has('status') && $request->status !== 'has_gift') {
-            $query->where('status', $request->status);
-        } elseif ($request->status === 'has_gift') {
-            $query->where('has_gift', true);
+        if ($request->has('status')) {
+            if ($request->status === 'has_gift') {
+                $query->where('has_gift', true);
+            } elseif ($request->status === 'all') {
+                // Retorna tudo, sem aplicar filtro.
+            } else {
+                $query->where('status', $request->status);
+            }
+        } else {
+            $query->where(function ($q) use ($activeStatuses) {
+                $q->whereIn('status', $activeStatuses)
+                    ->orWhere('has_gift', true);
+            });
         }
 
         $donations = $query->latest()->paginate(20);
@@ -75,9 +85,16 @@ class DonationController extends Controller
             ],
 
             'stats' => [
-                'total_raised' => Donation::where('status', 'approved')->sum('amount'),
-                'approved_count' => Donation::where('status', 'approved')->count(),
-                'pending_count' => Donation::where('status', 'pending')->count(),
+                'total_raised' => Donation::where('status', Donation::STATUS_APPROVED)->sum('amount'),
+
+                'approved_count' => Donation::where('status', Donation::STATUS_APPROVED)->count(),
+
+                'pending_count' => Donation::where('status', Donation::STATUS_PENDING)->count(),
+
+                'expired_count' => Donation::where('status', Donation::STATUS_EXPIRED)->count(),
+
+                'cancelled_count' => Donation::where('status', Donation::STATUS_CANCELLED)->count(),
+
                 'gifts_count' => Donation::where('has_gift', true)->count(),
             ],
         ]);
