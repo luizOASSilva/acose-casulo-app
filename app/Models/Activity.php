@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Activity extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'likes',
         'publication_id',
     ];
 
@@ -19,11 +19,28 @@ class Activity extends Model
     {
         return $this->whereHas('publication', function ($query) use ($value) {
             $query->where('slug', $value);
-        })->with('publication.media')->firstOrFail();
+        })
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])
+            ->firstOrFail();
     }
 
     public function publication(): BelongsTo
     {
         return $this->belongsTo(Publication::class);
     }
+
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(ActivitySchedule::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(ActivityLike::class);
+    }
 }
+

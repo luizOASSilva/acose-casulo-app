@@ -14,7 +14,10 @@ php artisan config:clear
 php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
+
+echo "Rodando migrations normais..."
 php artisan migrate --force
+
 php artisan config:cache
 
 (while true; do php artisan schedule:run; sleep 60; done) &
