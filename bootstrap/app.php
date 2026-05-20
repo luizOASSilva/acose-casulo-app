@@ -20,6 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->preventRequestForgery(except: [
+            'webhook/mercadopago',
+        ]);
+
         $middleware->api(append: [
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
@@ -34,4 +39,4 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('donations:expire')->everyFiveMinutes();
     })
     ->create();
-
+    
