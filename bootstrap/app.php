@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => null);
 
         $middleware->preventRequestForgery(except: [
+            'activities/*/like',
             'webhook/mercadopago',
         ]);
 
@@ -39,4 +40,3 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('donations:expire')->everyFiveMinutes();
     })
     ->create();
-    
