@@ -83,12 +83,13 @@ class ActivityController extends Controller
         )->response()->setStatusCode(201);
     }
 
-    public function show(string $slug)
+    public function show(string $activity)
     {
-        $activity = Activity::whereHas(
-            'publication',
-            fn ($q) => $q->where('slug', $slug)
-        )
+        $activityModel = Activity::query()
+            ->where('id', $activity)
+            ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
             ->with([
                 'publication.media',
                 'publication.admin',
@@ -97,7 +98,7 @@ class ActivityController extends Controller
             ->withCount('likes')
             ->firstOrFail();
 
-        return ActivityResource::make($activity);
+        return ActivityResource::make($activityModel);
     }
 
     public function update(UpdateActivityRequest $request, Activity $activity)
@@ -229,4 +230,3 @@ class ActivityController extends Controller
             );
     }
 }
-
