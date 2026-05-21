@@ -170,11 +170,16 @@ class ActivityController extends Controller
             })
             ->firstOrFail();
 
-        $visitorId = $request->cookie('visitor_id');
+        $visitorId =
+            $request->cookie('visitor_id')
+            ?? $request->header('X-Visitor-ID')
+            ?? $request->input('visitor_id');
 
         if (!$visitorId) {
             $visitorId = (string) Str::uuid();
         }
+
+        $visitorId = Str::limit((string) $visitorId, 64, '');
 
         $liked = false;
 
@@ -207,6 +212,7 @@ class ActivityController extends Controller
         return response()
             ->json([
                 'liked' => $liked,
+                'is_liked' => $liked,
                 'likes' => $likesCount,
                 'likes_count' => $likesCount,
             ])
