@@ -6,18 +6,26 @@ use App\Http\Requests\Activity\StoreActivityRequest;
 use App\Http\Requests\Activity\UpdateActivityRequest;
 use App\Http\Resources\ActivityResource;
 use App\Models\Activity;
+use App\Models\ActivityLike;
 use App\Models\Media;
 use App\Models\Publication;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ActivityController extends Controller
 {
     public function index()
     {
         return ActivityResource::collection(
-            Activity::with([
-                'publication.media',
-                'publication.admin',
-            ])
+            Activity::query()
+                ->with([
+                    'publication.media',
+                    'publication.admin',
+                    'schedules',
+                ])
+                ->withCount('likes')
                 ->latest()
                 ->paginate(12)
         );
@@ -26,10 +34,13 @@ class ActivityController extends Controller
     public function recent()
     {
         return ActivityResource::collection(
-            Activity::with([
-                'publication.media',
-                'publication.admin',
-            ])
+            Activity::query()
+                ->with([
+                    'publication.media',
+                    'publication.admin',
+                    'schedules',
+                ])
+                ->withCount('likes')
                 ->latest()
                 ->limit(9)
                 ->get()
@@ -38,26 +49,37 @@ class ActivityController extends Controller
 
     public function store(StoreActivityRequest $request)
     {
-        $media = Media::create([
-            'url' => $request->image_url,
-            'alt_text' => $request->image_description,
-            'caption' => null,
-        ]);
+        $validated = $request->validated();
 
-        $publication = Publication::create([
-            'title' => $request->title,
-            'content' => $request->input('content'),
-            'admin_id' => $request->user()->id,
-            'media_id' => $media->id,
-        ]);
+        $activity = DB::transaction(function () use ($validated, $request) {
+            $media = Media::create([
+                'url' => $validated['image_url'],
+                'alt_text' => $validated['image_description'],
+                'caption' => $validated['image_caption'] ?? null,
+            ]);
 
-        $activity = Activity::create([
-            'likes' => $request->likes ?? 0,
-            'publication_id' => $publication->id,
-        ]);
+            $publication = Publication::create([
+                'title' => $validated['title'],
+                'content' => $validated['content'],
+                'admin_id' => $request->user()->id,
+                'media_id' => $media->id,
+            ]);
+
+            $activity = Activity::create([
+                'publication_id' => $publication->id,
+            ]);
+
+            $activity->schedules()->createMany($validated['schedules']);
+
+            return $activity;
+        });
 
         return ActivityResource::make(
-            $activity->load('publication.media')
+            $activity->load([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])->loadCount('likes')
         )->response()->setStatusCode(201);
     }
 
@@ -70,7 +92,9 @@ class ActivityController extends Controller
             ->with([
                 'publication.media',
                 'publication.admin',
+                'schedules',
             ])
+            ->withCount('likes')
             ->firstOrFail();
 
         return ActivityResource::make($activity);
@@ -78,24 +102,46 @@ class ActivityController extends Controller
 
     public function update(UpdateActivityRequest $request, Activity $activity)
     {
-        $activity->load('publication.media');
+        $validated = $request->validated();
 
-        $activity->publication->media->update([
-            'url' => $request->image_url,
-            'alt_text' => $request->image_description,
-        ]);
+        DB::transaction(function () use ($validated, $activity) {
+            $activity->load('publication.media');
 
-        $activity->publication->update([
-            'title' => $request->title,
-            'content' => $request->input('content'),
-        ]);
+            if (
+                isset($validated['image_url']) ||
+                isset($validated['image_description']) ||
+                array_key_exists('image_caption', $validated)
+            ) {
+                $activity->publication->media->update([
+                    'url' => $validated['image_url'] ?? $activity->publication->media->url,
+                    'alt_text' => $validated['image_description'] ?? $activity->publication->media->alt_text,
+                    'caption' => array_key_exists('image_caption', $validated)
+                        ? $validated['image_caption']
+                        : $activity->publication->media->caption,
+                ]);
+            }
 
-        $activity->update([
-            'likes' => $request->likes,
-        ]);
+            if (isset($validated['title']) || isset($validated['content'])) {
+                $activity->publication->update([
+                    'title' => $validated['title'] ?? $activity->publication->title,
+                    'content' => $validated['content'] ?? $activity->publication->content,
+                ]);
+            }
+
+            if (array_key_exists('schedules', $validated)) {
+                $activity->schedules()->delete();
+                $activity->schedules()->createMany($validated['schedules']);
+            }
+        });
 
         return ActivityResource::make(
-            $activity->load('publication.media')
+            $activity->fresh()
+                ->load([
+                    'publication.media',
+                    'publication.admin',
+                    'schedules',
+                ])
+                ->loadCount('likes')
         );
     }
 
@@ -103,8 +149,84 @@ class ActivityController extends Controller
     {
         $activity->load('publication.media');
 
-        $activity->publication->delete();
+        DB::transaction(function () use ($activity) {
+            $publication = $activity->publication;
+            $media = $publication?->media;
+
+            $activity->delete();
+            $publication?->delete();
+            $media?->delete();
+        });
 
         return response()->json(null, 204);
     }
+
+    public function toggleLike(Request $request, string $activity): JsonResponse
+    {
+        $activityModel = Activity::query()
+            ->where('id', $activity)
+            ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
+            ->firstOrFail();
+
+        $visitorId =
+            $request->cookie('visitor_id')
+            ?? $request->header('X-Visitor-ID')
+            ?? $request->input('visitor_id');
+
+        if (!$visitorId) {
+            $visitorId = (string) Str::uuid();
+        }
+
+        $visitorId = Str::limit((string) $visitorId, 64, '');
+
+        $liked = false;
+
+        DB::transaction(function () use ($activityModel, $request, $visitorId, &$liked) {
+            $like = ActivityLike::query()
+                ->where('activity_id', $activityModel->id)
+                ->where('visitor_id', $visitorId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($like) {
+                $like->delete();
+                $liked = false;
+
+                return;
+            }
+
+            ActivityLike::create([
+                'activity_id' => $activityModel->id,
+                'visitor_id' => $visitorId,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            $liked = true;
+        });
+
+        $likesCount = $activityModel->likes()->count();
+
+        return response()
+            ->json([
+                'liked' => $liked,
+                'is_liked' => $liked,
+                'likes' => $likesCount,
+                'likes_count' => $likesCount,
+            ])
+            ->cookie(
+                'visitor_id',
+                $visitorId,
+                60 * 24 * 365,
+                null,
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'Lax'
+            );
+    }
 }
+

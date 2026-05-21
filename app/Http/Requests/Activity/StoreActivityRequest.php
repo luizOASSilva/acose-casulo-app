@@ -2,24 +2,17 @@
 
 namespace App\Http\Requests\Activity;
 
-use Illuminate\Contracts\Validation\ValidationRule;
+use App\Models\ActivitySchedule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreActivityRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
@@ -47,11 +40,84 @@ class StoreActivityRequest extends FormRequest
                 'max:255',
             ],
 
-            'likes' => [
-                'sometimes',
-                'integer',
-                'min:0',
+            'image_caption' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'schedules' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+
+            'schedules.*.weekday' => [
+                'required',
+                'string',
+                'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+            ],
+
+            'schedules.*.start_time' => [
+                'required',
+                'date_format:H:i',
+            ],
+
+            'schedules.*.end_time' => [
+                'required',
+                'date_format:H:i',
+                'after:schedules.*.start_time',
             ],
         ];
     }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                $schedules = $this->input('schedules', []);
+
+                foreach ($schedules as $index => $schedule) {
+                    if (
+                        empty($schedule['weekday']) ||
+                        empty($schedule['start_time']) ||
+                        empty($schedule['end_time'])
+                    ) {
+                        continue;
+                    }
+
+                    $hasConflict = ActivitySchedule::query()
+                        ->where('weekday', $schedule['weekday'])
+                        ->where('start_time', '<', $schedule['end_time'])
+                        ->where('end_time', '>', $schedule['start_time'])
+                        ->exists();
+
+                    if ($hasConflict) {
+                        $validator->errors()->add(
+                            "schedules.$index.start_time",
+                            'Já existe uma atividade cadastrada nesse dia e horário.'
+                        );
+                    }
+
+                    foreach ($schedules as $otherIndex => $otherSchedule) {
+                        if ($index === $otherIndex) {
+                            continue;
+                        }
+
+                        if (
+                            ($schedule['weekday'] ?? null) === ($otherSchedule['weekday'] ?? null) &&
+                            ($schedule['start_time'] ?? null) < ($otherSchedule['end_time'] ?? null) &&
+                            ($schedule['end_time'] ?? null) > ($otherSchedule['start_time'] ?? null)
+                        ) {
+                            $validator->errors()->add(
+                                "schedules.$index.start_time",
+                                'Existem horários sobrepostos nesta atividade.'
+                            );
+                        }
+                    }
+                }
+            },
+        ];
+    }
 }
+

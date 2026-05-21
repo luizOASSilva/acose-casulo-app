@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Activity;
+use App\Models\ActivityLike;
+use App\Models\ActivitySchedule;
 use App\Models\Admin;
 use App\Models\Article;
 use App\Models\Document;
@@ -29,7 +31,35 @@ class DatabaseSeeder extends Seeder
                 );
             });
 
-        Activity::factory(15)->create();
+        $weekdays = [
+            'monday',
+            'tuesday',
+            'wednesday',
+            'thursday',
+            'friday',
+        ];
+
+        Activity::factory(15)
+            ->create()
+            ->each(function (Activity $activity, int $index) use ($weekdays) {
+                $weekday = $weekdays[$index % count($weekdays)];
+
+                $startHour = 8 + ($index % 5);
+                $endHour = $startHour + 2;
+
+                ActivitySchedule::factory()
+                    ->for($activity)
+                    ->create([
+                        'weekday' => $weekday,
+                        'start_time' => str_pad((string) $startHour, 2, '0', STR_PAD_LEFT) . ':00',
+                        'end_time' => str_pad((string) $endHour, 2, '0', STR_PAD_LEFT) . ':00',
+                    ]);
+
+                ActivityLike::factory()
+                    ->count(fake()->numberBetween(10, 500))
+                    ->for($activity)
+                    ->create();
+            });
 
         $categories = DocumentCategory::factory()->createMany([
             [
