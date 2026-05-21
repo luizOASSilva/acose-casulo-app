@@ -1,6 +1,5 @@
 FROM php:8.4-fpm-alpine
 
-# Instala dependências do sistema e extensões do PHP
 RUN apk add --no-cache \
     nginx \
     curl \
@@ -18,40 +17,30 @@ RUN apk add --no-cache \
     bcmath \
     pcntl
 
-# SOLUÇÃO DO ERRO 500: Aumenta o limite de processos (children) do PHP
 RUN sed -i 's/pm.max_children = 5/pm.max_children = 20/g' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/pm.start_servers = 2/pm.start_servers = 5/g' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/pm.min_spare_servers = 1/pm.min_spare_servers = 5/g' /usr/local/etc/php-fpm.d/www.conf && \
     sed -i 's/pm.max_spare_servers = 3/pm.max_spare_servers = 10/g' /usr/local/etc/php-fpm.d/www.conf
 
-# Instala o Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copia apenas composer files primeiro (melhor uso de cache)
 COPY composer.json composer.lock ./
 
-# Instala as dependências
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
-# Verifica se o pacote foi instalado
-RUN ls vendor/google/ && echo "Google packages OK"
-
-# Copia o resto do projeto
 COPY . .
 
-# Roda os scripts pós-install
 RUN composer dump-autoload --optimize
 
-# Copia configurações e certificados
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/start.sh /start.sh
 COPY docker/ca.pem /etc/ssl/certs/aiven-ca.pem
 
-# Permissões
-RUN chmod +x /start.sh
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod +x /start.sh && \
+    mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache && \
+    chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 8080
 
