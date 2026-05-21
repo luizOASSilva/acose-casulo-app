@@ -12,6 +12,7 @@ use App\Models\Publication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ActivityController extends Controller
 {
@@ -106,7 +107,11 @@ class ActivityController extends Controller
         DB::transaction(function () use ($validated, $activity) {
             $activity->load('publication.media');
 
-            if (isset($validated['image_url']) || isset($validated['image_description']) || array_key_exists('image_caption', $validated)) {
+            if (
+                isset($validated['image_url']) ||
+                isset($validated['image_description']) ||
+                array_key_exists('image_caption', $validated)
+            ) {
                 $activity->publication->media->update([
                     'url' => $validated['image_url'] ?? $activity->publication->media->url,
                     'alt_text' => $validated['image_description'] ?? $activity->publication->media->alt_text,
@@ -156,22 +161,27 @@ class ActivityController extends Controller
         return response()->json(null, 204);
     }
 
-    public function toggleLike(Request $request, Activity $activity): JsonResponse
+    public function toggleLike(Request $request, string $activity): JsonResponse
     {
-        $validated = $request->validate([
-            'visitor_id' => [
-                'required',
-                'string',
-                'max:64',
-            ],
-        ]);
+        $activityModel = Activity::query()
+            ->where('id', $activity)
+            ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
+            ->firstOrFail();
+
+        $visitorId = $request->cookie('visitor_id');
+
+        if (!$visitorId) {
+            $visitorId = (string) Str::uuid();
+        }
 
         $liked = false;
 
-        DB::transaction(function () use ($activity, $request, $validated, &$liked) {
+        DB::transaction(function () use ($activityModel, $request, $visitorId, &$liked) {
             $like = ActivityLike::query()
-                ->where('activity_id', $activity->id)
-                ->where('visitor_id', $validated['visitor_id'])
+                ->where('activity_id', $activityModel->id)
+                ->where('visitor_id', $visitorId)
                 ->lockForUpdate()
                 ->first();
 
@@ -183,8 +193,8 @@ class ActivityController extends Controller
             }
 
             ActivityLike::create([
-                'activity_id' => $activity->id,
-                'visitor_id' => $validated['visitor_id'],
+                'activity_id' => $activityModel->id,
+                'visitor_id' => $visitorId,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -192,9 +202,25 @@ class ActivityController extends Controller
             $liked = true;
         });
 
-        return response()->json([
-            'liked' => $liked,
-            'likes' => $activity->likes()->count(),
-        ]);
+        $likesCount = $activityModel->likes()->count();
+
+        return response()
+            ->json([
+                'liked' => $liked,
+                'likes' => $likesCount,
+                'likes_count' => $likesCount,
+            ])
+            ->cookie(
+                'visitor_id',
+                $visitorId,
+                60 * 24 * 365,
+                null,
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'Lax'
+            );
     }
 }
+
