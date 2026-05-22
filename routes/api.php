@@ -51,6 +51,17 @@ Route::post('/activities/{activity}/like', [ActivityController::class, 'toggleLi
 
 /*
 |--------------------------------------------------------------------------
+| Agenda de Atividades - Administrativo
+|--------------------------------------------------------------------------
+| IMPORTANTE:
+| Fica antes do apiResource('activities'), porque senão "schedules" pode ser
+| interpretado como parâmetro da rota show.
+*/
+Route::get('/activities/schedules', [ActivityController::class, 'schedules'])
+    ->middleware('auth:admin');
+
+/*
+|--------------------------------------------------------------------------
 | Listagens Públicas
 |--------------------------------------------------------------------------
 */

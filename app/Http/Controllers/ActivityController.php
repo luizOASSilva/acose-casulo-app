@@ -7,6 +7,7 @@ use App\Http\Requests\Activity\UpdateActivityRequest;
 use App\Http\Resources\ActivityResource;
 use App\Models\Activity;
 use App\Models\ActivityLike;
+use App\Models\ActivitySchedule;
 use App\Models\Media;
 use App\Models\Publication;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +46,23 @@ class ActivityController extends Controller
                 ->limit(9)
                 ->get()
         );
+    }
+
+    public function schedules()
+    {
+        return ActivitySchedule::query()
+            ->with('activity.publication')
+            ->orderByRaw("FIELD(weekday, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')")
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn ($schedule) => [
+                'id' => $schedule->id,
+                'activity_id' => $schedule->activity_id,
+                'activity_title' => $schedule->activity?->publication?->title,
+                'weekday' => $schedule->weekday,
+                'start_time' => substr($schedule->start_time, 0, 5),
+                'end_time' => substr($schedule->end_time, 0, 5),
+            ]);
     }
 
     public function store(StoreActivityRequest $request)
