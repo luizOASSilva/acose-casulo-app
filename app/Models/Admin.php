@@ -11,9 +11,13 @@ class Admin extends Authenticatable
 {
     use HasApiTokens, HasFactory;
 
+    public const ROLE_MASTER = 'master';
+    public const ROLE_ADMIN = 'admin';
+
     protected $fillable = [
         'name',
         'email',
+        'role',
         'password',
     ];
 
@@ -27,6 +31,16 @@ class Admin extends Authenticatable
         return [
             'password' => 'hashed',
         ];
+    }
+
+    public function isMaster(): bool
+    {
+        return $this->role === self::ROLE_MASTER;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
     }
 
     public function partners(): HasMany

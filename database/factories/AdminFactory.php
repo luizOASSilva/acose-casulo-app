@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Admin;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Hash;
 
 class AdminFactory extends Factory
 {
@@ -12,7 +12,23 @@ class AdminFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'password' => Hash::make('password'),
+            'role' => Admin::ROLE_ADMIN,
+            'password' => 'password',
         ];
     }
+
+    public function master(): static
+    {
+        return $this->state(fn () => [
+            'role' => Admin::ROLE_MASTER,
+        ]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => [
+            'role' => Admin::ROLE_ADMIN,
+        ]);
+    }
 }
+

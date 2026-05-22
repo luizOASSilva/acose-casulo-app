@@ -6,14 +6,14 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateAdminRequest extends FormRequest
+class StoreAdminRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->role === 'master';
     }
 
     /**
@@ -23,25 +23,29 @@ class UpdateAdminRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('admin');
-
         return [
             'name' => [
-                'sometimes',
+                'required',
                 'string',
                 'min:3',
                 'max:255',
             ],
 
             'email' => [
-                'sometimes',
+                'required',
                 'email',
-                Rule::unique('admins', 'email')->ignore($id),
+                'max:255',
+                Rule::unique('admins', 'email'),
+            ],
+
+            'role' => [
+                'required',
+                'string',
+                Rule::in(['master', 'admin']),
             ],
 
             'password' => [
-                'sometimes',
-                'nullable',
+                'required',
                 'string',
                 'min:8',
                 'confirmed',

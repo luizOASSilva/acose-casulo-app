@@ -16,10 +16,18 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = Admin::factory()->create([
+        $this->call([
+            SettingsSeeder::class,
+            DocumentCategorySeeder::class,
+        ]);
+
+        $admin = Admin::factory()->master()->create([
             'name' => 'Admin Test',
             'email' => 'admin@test.com',
+            'password' => 'password',
         ]);
+
+        Admin::factory(2)->admin()->create();
 
         $keywords = Keyword::factory(10)->create();
 
@@ -61,44 +69,9 @@ class DatabaseSeeder extends Seeder
                     ->create();
             });
 
-        $categories = DocumentCategory::factory()->createMany([
-            [
-                'name' => 'Atos de Divulgação',
-                'description' => 'DOCUMENTOS OFICIAIS E REGISTROS DE TRANSPARÊNCIA ATUALIZADOS.',
-                'featured' => false,
-                'order' => 1,
-            ],
-            [
-                'name' => 'Remuneração e Contratos',
-                'description' => 'DETALHAMENTO DE RECURSOS HUMANOS E CONTRATAÇÕES VIGENTES.',
-                'featured' => false,
-                'order' => 2,
-            ],
-            [
-                'name' => 'Financeiro',
-                'description' => 'BALANCETES, DEMONSTRATIVOS E PRESTAÇÃO DE CONTAS ANUAIS.',
-                'featured' => false,
-                'order' => 3,
-            ],
-            [
-                'name' => 'Compras e Fornecedores',
-                'description' => 'PROCESSOS DE AQUISIÇÃO, LICITAÇÕES E RELAÇÃO DE PARCEIROS.',
-                'featured' => false,
-                'order' => 4,
-            ],
-            [
-                'name' => 'Campanhas Mensais',
-                'description' => 'AÇÕES DE ARRECADAÇÃO E DESTINAÇÃO DE RECURSOS DE DOAÇÕES.',
-                'featured' => false,
-                'order' => 5,
-            ],
-            [
-                'name' => 'Centro Dia',
-                'description' => 'DOCUMENTAÇÃO ESPECÍFICA DA UNIDADE E ATIVIDADES REALIZADAS.',
-                'featured' => true,
-                'order' => 6,
-            ],
-        ]);
+        $categories = DocumentCategory::query()
+            ->orderBy('order')
+            ->get();
 
         foreach ($categories as $category) {
             foreach ([2024, 2025, 2026] as $year) {

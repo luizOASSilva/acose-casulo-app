@@ -13,7 +13,7 @@ class StoreAdminRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->role === 'master';
     }
 
     /**
@@ -34,7 +34,14 @@ class StoreAdminRequest extends FormRequest
             'email' => [
                 'required',
                 'email',
+                'max:255',
                 Rule::unique('admins', 'email'),
+            ],
+
+            'role' => [
+                'required',
+                'string',
+                Rule::in(['master', 'admin']),
             ],
 
             'password' => [

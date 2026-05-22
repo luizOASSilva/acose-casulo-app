@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminIsMaster;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->alias([
+            'admin.master' => EnsureAdminIsMaster::class,
+        ]);
 
         $middleware->preventRequestForgery(except: [
             'activities/*/like',
