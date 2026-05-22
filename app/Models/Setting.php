@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
@@ -45,6 +46,7 @@ class Setting extends Model
                 ->where('is_public', true)
                 ->orderBy('group')
                 ->orderBy('sort_order')
+                ->orderBy('id')
                 ->get()
                 ->mapWithKeys(fn (Setting $setting) => [
                     $setting->key => $setting->value,
@@ -53,13 +55,12 @@ class Setting extends Model
         });
     }
 
-    public static function adminCached()
+    public static function adminCached(): Collection
     {
-        return Cache::rememberForever(self::ADMIN_CACHE_KEY, function () {
-            return self::query()
-                ->orderBy('group')
-                ->orderBy('sort_order')
-                ->get();
-        });
+        return self::query()
+            ->orderBy('group')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
     }
 }
