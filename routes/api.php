@@ -15,6 +15,7 @@ use App\Http\Controllers\DonationController;
 use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\Settings\SettingController;
+use App\Http\Controllers\Media\MediaLibraryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -122,6 +123,15 @@ Route::middleware('auth:admin')->group(function () {
     */
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Biblioteca de Mídia
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/media/{collection}', [MediaLibraryController::class, 'index']);
+    Route::post('/media/{collection}', [MediaLibraryController::class, 'store']);
+    Route::delete('/media/{collection}/{mediaFile}', [MediaLibraryController::class, 'destroy']);
 
     /*
     |--------------------------------------------------------------------------

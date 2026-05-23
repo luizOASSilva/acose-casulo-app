@@ -21,3 +21,4 @@ class ActivityLikeFactory extends Factory
         ];
     }
 }
+

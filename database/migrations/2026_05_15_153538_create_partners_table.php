@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('admin_id')->constrained('admins')->onDelete('cascade');
             $table->string('name');
-            $table->string('logo_path');
+            $table->string('logo_path')->nullable();
             $table->string('website_url')->nullable();
             $table->string('bg_color')->default('#ffffff');
             $table->integer('order')->default(0);

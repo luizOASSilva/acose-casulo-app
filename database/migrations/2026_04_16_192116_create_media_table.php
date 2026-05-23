@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table) {
             $table->id();
-            $table->string('url')->unique();
+            $table->string('url');
             $table->string('alt_text')->nullable();
             $table->string('caption')->nullable();
             $table->timestamps();

@@ -8,12 +8,11 @@ class MediaFactory extends Factory
 {
     public function definition(): array
     {
-        $seed = fake()->unique()->numberBetween(1, 1000);
-
         return [
-            'url' => "https://picsum.photos/seed/{$seed}/800/600",
+            'url' => '/logo.svg',
             'alt_text' => fake()->sentence(4),
-            'caption' => fake()->optional()->sentence(6),
+            'caption' => fake()->optional(0.7)->sentence(6),
         ];
     }
 }
+

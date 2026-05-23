@@ -23,7 +23,10 @@ class Publication extends Model
 
     public function getSlugOptions(): SlugOptions
     {
-        return SlugOptions::create()->generateSlugsFrom('title')->saveSlugsTo('slug')->slugsShouldBeNoLongerThan(80);
+        return SlugOptions::create()
+            ->generateSlugsFrom('title')
+            ->saveSlugsTo('slug')
+            ->slugsShouldBeNoLongerThan(80);
     }
 
     public function admin(): BelongsTo
@@ -38,7 +41,7 @@ class Publication extends Model
 
     public function post(): HasOne
     {
-        return $this->hasOne(Post::class);
+        return $this->hasOne(Activity::class);
     }
 
     public function media(): BelongsTo
