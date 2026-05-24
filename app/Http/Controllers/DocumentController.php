@@ -11,9 +11,14 @@ class DocumentController extends Controller
 {
     public function index()
     {
-        $documents = Document::with('category')
-            ->when(request('year'), fn ($q, $year) => $q->where('year', $year))
-            ->when(request('category_id'), fn ($q, $id) => $q->where('category_id', $id))
+        $documents = Document::query()
+            ->with([
+                'category',
+                'admin',
+            ])
+            ->when(request('year'), fn ($query, $year) => $query->where('year', $year))
+            ->when(request('category_id'), fn ($query, $id) => $query->where('category_id', $id))
+            ->latest()
             ->paginate();
 
         return DocumentResource::collection($documents);
@@ -21,21 +26,49 @@ class DocumentController extends Controller
 
     public function store(StoreDocumentRequest $request)
     {
-        $document = Document::create($request->validated());
+        $validated = $request->validated();
 
-        return DocumentResource::make($document->load('category'))->response()->setStatusCode(201);
+        $adminId = $request->user('admin')?->id ?? $request->user()?->id;
+
+        abort_unless($adminId, 403, 'Administrador não autenticado.');
+
+        $document = Document::query()->create([
+            ...$validated,
+            'admin_id' => $adminId,
+        ]);
+
+        return DocumentResource::make(
+            $document->load([
+                'category',
+                'admin',
+            ])
+        )->response()->setStatusCode(201);
     }
 
     public function show(Document $document)
     {
-        return DocumentResource::make($document->load('category'));
+        return DocumentResource::make(
+            $document->load([
+                'category',
+                'admin',
+            ])
+        );
     }
 
     public function update(UpdateDocumentRequest $request, Document $document)
     {
-        $document->update($request->validated());
+        $validated = $request->validated();
 
-        return DocumentResource::make($document->load('category'));
+        unset($validated['admin_id']);
+
+        $document->update($validated);
+
+        return DocumentResource::make(
+            $document->fresh()->load([
+                'category',
+                'admin',
+            ])
+        );
     }
 
     public function destroy(Document $document)

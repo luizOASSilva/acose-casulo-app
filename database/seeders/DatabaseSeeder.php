@@ -206,7 +206,7 @@ class DatabaseSeeder extends Seeder
                 )
             );
 
-            $url = Storage::url($path);
+            $url = asset(Storage::url($path));
 
             MediaFile::query()->create([
                 'collection' => 'partners',
@@ -287,7 +287,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $url = Storage::url($path);
+        $url = asset(Storage::url($path));
         $size = Storage::disk('public')->size($path);
 
         MediaFile::query()->create([

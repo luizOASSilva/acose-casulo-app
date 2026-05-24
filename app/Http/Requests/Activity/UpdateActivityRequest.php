@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Activity;
 
+use App\Models\Activity;
 use App\Models\ActivitySchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -18,6 +19,7 @@ class UpdateActivityRequest extends FormRequest
         return [
             'title' => [
                 'sometimes',
+                'required',
                 'string',
                 'min:3',
                 'max:51',
@@ -25,17 +27,20 @@ class UpdateActivityRequest extends FormRequest
 
             'content' => [
                 'sometimes',
+                'required',
                 'string',
             ],
 
             'image_url' => [
                 'sometimes',
-                'url',
+                'required',
+                'string',
                 'max:2048',
             ],
 
             'image_description' => [
                 'sometimes',
+                'required',
                 'string',
                 'max:255',
             ],
@@ -48,6 +53,7 @@ class UpdateActivityRequest extends FormRequest
 
             'schedules' => [
                 'sometimes',
+                'required',
                 'array',
                 'min:1',
             ],
@@ -66,7 +72,6 @@ class UpdateActivityRequest extends FormRequest
             'schedules.*.end_time' => [
                 'required_with:schedules',
                 'date_format:H:i',
-                'after:schedules.*.start_time',
             ],
         ];
     }
@@ -75,11 +80,19 @@ class UpdateActivityRequest extends FormRequest
     {
         return [
             function (Validator $validator) {
-                if (!$this->has('schedules')) {
+                if (! $this->has('schedules')) {
                     return;
                 }
 
-                $activity = $this->route('activity');
+                $activityParam = $this->route('activity');
+
+                $activityModel = Activity::query()
+                    ->where('id', $activityParam)
+                    ->orWhereHas('publication', function ($query) use ($activityParam) {
+                        $query->where('slug', $activityParam);
+                    })
+                    ->first();
+
                 $schedules = $this->input('schedules', []);
 
                 foreach ($schedules as $index => $schedule) {
@@ -91,12 +104,25 @@ class UpdateActivityRequest extends FormRequest
                         continue;
                     }
 
-                    $hasConflict = ActivitySchedule::query()
+                    if ($schedule['end_time'] <= $schedule['start_time']) {
+                        $validator->errors()->add(
+                            "schedules.$index.end_time",
+                            'O horário de fim deve ser depois do horário de início.'
+                        );
+
+                        continue;
+                    }
+
+                    $conflictQuery = ActivitySchedule::query()
                         ->where('weekday', $schedule['weekday'])
                         ->where('start_time', '<', $schedule['end_time'])
-                        ->where('end_time', '>', $schedule['start_time'])
-                        ->where('activity_id', '!=', $activity->id)
-                        ->exists();
+                        ->where('end_time', '>', $schedule['start_time']);
+
+                    if ($activityModel) {
+                        $conflictQuery->where('activity_id', '!=', $activityModel->id);
+                    }
+
+                    $hasConflict = $conflictQuery->exists();
 
                     if ($hasConflict) {
                         $validator->errors()->add(
@@ -111,9 +137,17 @@ class UpdateActivityRequest extends FormRequest
                         }
 
                         if (
-                            ($schedule['weekday'] ?? null) === ($otherSchedule['weekday'] ?? null) &&
-                            ($schedule['start_time'] ?? null) < ($otherSchedule['end_time'] ?? null) &&
-                            ($schedule['end_time'] ?? null) > ($otherSchedule['start_time'] ?? null)
+                            empty($otherSchedule['weekday']) ||
+                            empty($otherSchedule['start_time']) ||
+                            empty($otherSchedule['end_time'])
+                        ) {
+                            continue;
+                        }
+
+                        if (
+                            $schedule['weekday'] === $otherSchedule['weekday'] &&
+                            $schedule['start_time'] < $otherSchedule['end_time'] &&
+                            $schedule['end_time'] > $otherSchedule['start_time']
                         ) {
                             $validator->errors()->add(
                                 "schedules.$index.start_time",
@@ -126,4 +160,3 @@ class UpdateActivityRequest extends FormRequest
         ];
     }
 }
-

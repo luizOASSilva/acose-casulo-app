@@ -20,6 +20,7 @@ class UpdateArticleRequest extends FormRequest
         return [
             'title' => [
                 'sometimes',
+                'required',
                 'string',
                 'min:3',
                 'max:51',
@@ -27,17 +28,20 @@ class UpdateArticleRequest extends FormRequest
 
             'content' => [
                 'sometimes',
+                'required',
                 'string',
             ],
 
             'image_url' => [
                 'sometimes',
-                'url',
+                'required',
+                'string',
                 'max:2048',
             ],
 
             'image_description' => [
                 'sometimes',
+                'required',
                 'string',
                 'max:255',
             ],
@@ -50,6 +54,7 @@ class UpdateArticleRequest extends FormRequest
 
             'summary' => [
                 'sometimes',
+                'required',
                 'string',
                 'max:160',
             ],

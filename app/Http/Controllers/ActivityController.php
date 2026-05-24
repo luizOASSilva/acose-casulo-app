@@ -119,42 +119,55 @@ class ActivityController extends Controller
         return ActivityResource::make($activityModel);
     }
 
-    public function update(UpdateActivityRequest $request, Activity $activity)
+    public function update(UpdateActivityRequest $request, string $activity)
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $activity) {
-            $activity->load('publication.media');
+        $activityModel = Activity::query()
+            ->where('id', $activity)
+            ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])
+            ->withCount('likes')
+            ->firstOrFail();
+
+        DB::transaction(function () use ($validated, $activityModel) {
+            $activityModel->load('publication.media');
 
             if (
                 isset($validated['image_url']) ||
                 isset($validated['image_description']) ||
                 array_key_exists('image_caption', $validated)
             ) {
-                $activity->publication->media->update([
-                    'url' => $validated['image_url'] ?? $activity->publication->media->url,
-                    'alt_text' => $validated['image_description'] ?? $activity->publication->media->alt_text,
+                $activityModel->publication->media->update([
+                    'url' => $validated['image_url'] ?? $activityModel->publication->media->url,
+                    'alt_text' => $validated['image_description'] ?? $activityModel->publication->media->alt_text,
                     'caption' => array_key_exists('image_caption', $validated)
                         ? $validated['image_caption']
-                        : $activity->publication->media->caption,
+                        : $activityModel->publication->media->caption,
                 ]);
             }
 
             if (isset($validated['title']) || isset($validated['content'])) {
-                $activity->publication->update([
-                    'title' => $validated['title'] ?? $activity->publication->title,
-                    'content' => $validated['content'] ?? $activity->publication->content,
+                $activityModel->publication->update([
+                    'title' => $validated['title'] ?? $activityModel->publication->title,
+                    'content' => $validated['content'] ?? $activityModel->publication->content,
                 ]);
             }
 
             if (array_key_exists('schedules', $validated)) {
-                $activity->schedules()->delete();
-                $activity->schedules()->createMany($validated['schedules']);
+                $activityModel->schedules()->delete();
+                $activityModel->schedules()->createMany($validated['schedules']);
             }
         });
 
         return ActivityResource::make(
-            $activity->fresh()
+            $activityModel->fresh()
                 ->load([
                     'publication.media',
                     'publication.admin',

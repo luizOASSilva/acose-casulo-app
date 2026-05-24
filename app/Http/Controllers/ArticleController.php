@@ -9,6 +9,7 @@ use App\Models\Article;
 use App\Models\Keyword;
 use App\Models\Media;
 use App\Models\Publication;
+use Illuminate\Support\Facades\DB;
 
 class ArticleController extends Controller
 {
@@ -31,6 +32,7 @@ class ArticleController extends Controller
             Article::with([
                 'publication.media',
                 'publication.admin',
+                'keywords',
             ])
                 ->latest()
                 ->limit(4)
@@ -40,72 +42,133 @@ class ArticleController extends Controller
 
     public function store(StoreArticleRequest $request)
     {
-        $media = Media::create([
-            'url' => $request->image_url,
-            'alt_text' => $request->image_description,
-            'caption' => null,
-        ]);
+        $validated = $request->validated();
 
-        $publication = Publication::create([
-            'title' => $request->title,
-            'content' => $request->input('content'),
-            'admin_id' => $request->user()->id,
-            'media_id' => $media->id,
-        ]);
+        $article = DB::transaction(function () use ($validated, $request) {
+            $media = Media::create([
+                'url' => $validated['image_url'],
+                'alt_text' => $validated['image_description'],
+                'caption' => $validated['image_caption'] ?? null,
+            ]);
 
-        $article = Article::create([
-            'summary' => $request->summary,
-            'publication_id' => $publication->id,
-        ]);
+            $publication = Publication::create([
+                'title' => $validated['title'],
+                'content' => $validated['content'],
+                'admin_id' => $request->user()->id,
+                'media_id' => $media->id,
+            ]);
 
-        if ($request->has('keywords')) {
-            $keywordIds = collect($request->keywords)->map(
-                fn ($word) => Keyword::firstOrCreate(['word' => $word])->id
-            );
+            $article = Article::create([
+                'summary' => $validated['summary'],
+                'publication_id' => $publication->id,
+            ]);
 
-            $article->keywords()->attach($keywordIds);
-        }
+            if (array_key_exists('keywords', $validated)) {
+                $keywordIds = collect($validated['keywords'])
+                    ->filter()
+                    ->map(fn ($word) => Keyword::firstOrCreate([
+                        'word' => $word,
+                    ])->id);
+
+                $article->keywords()->attach($keywordIds);
+            }
+
+            return $article;
+        });
 
         return ArticleResource::make(
-            $article->load('publication.media', 'keywords')
+            $article->load([
+                'publication.media',
+                'publication.admin',
+                'keywords',
+            ])
         )->response()->setStatusCode(201);
     }
 
-    public function show(Article $article)
+    public function show(string $article)
     {
-        return ArticleResource::make(
-            $article->load('publication.media', 'publication.admin', 'keywords')
-        );
+        $articleModel = Article::query()
+            ->where('id', $article)
+            ->orWhereHas('publication', function ($query) use ($article) {
+                $query->where('slug', $article);
+            })
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'keywords',
+            ])
+            ->firstOrFail();
+
+        return ArticleResource::make($articleModel);
     }
 
-    public function update(UpdateArticleRequest $request, Article $article)
+    public function update(UpdateArticleRequest $request, string $article)
     {
-        $article->load('publication.media', 'publication.admin', 'keywords');
+        $validated = $request->validated();
 
-        $article->publication->media()->update([
-            'url' => $request->image_url,
-            'alt_text' => $request->image_description,
-        ]);
+        $articleModel = Article::query()
+            ->where('id', $article)
+            ->orWhereHas('publication', function ($query) use ($article) {
+                $query->where('slug', $article);
+            })
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'keywords',
+            ])
+            ->firstOrFail();
 
-        $article->publication->update([
-            'title' => $request->title,
-            'content' => $request->input('content'),
-        ]);
+        DB::transaction(function () use ($validated, $articleModel) {
+            $articleModel->load('publication.media');
 
-        $article->update([
-            'summary' => $request->summary,
-        ]);
+            if (
+                array_key_exists('image_url', $validated) ||
+                array_key_exists('image_description', $validated) ||
+                array_key_exists('image_caption', $validated)
+            ) {
+                $articleModel->publication->media->update([
+                    'url' => $validated['image_url'] ?? $articleModel->publication->media->url,
+                    'alt_text' => $validated['image_description'] ?? $articleModel->publication->media->alt_text,
+                    'caption' => array_key_exists('image_caption', $validated)
+                        ? $validated['image_caption']
+                        : $articleModel->publication->media->caption,
+                ]);
+            }
 
-        if ($request->has('keywords')) {
-            $keywordIds = collect($request->keywords)->map(
-                fn ($word) => Keyword::firstOrCreate(['word' => $word])->id
-            );
+            if (
+                array_key_exists('title', $validated) ||
+                array_key_exists('content', $validated)
+            ) {
+                $articleModel->publication->update([
+                    'title' => $validated['title'] ?? $articleModel->publication->title,
+                    'content' => $validated['content'] ?? $articleModel->publication->content,
+                ]);
+            }
 
-            $article->keywords()->sync($keywordIds);
-        }
+            if (array_key_exists('summary', $validated)) {
+                $articleModel->update([
+                    'summary' => $validated['summary'],
+                ]);
+            }
+
+            if (array_key_exists('keywords', $validated)) {
+                $keywordIds = collect($validated['keywords'])
+                    ->filter()
+                    ->map(fn ($word) => Keyword::firstOrCreate([
+                        'word' => $word,
+                    ])->id);
+
+                $articleModel->keywords()->sync($keywordIds);
+            }
+        });
 
         return ArticleResource::make(
-            $article->load('publication.media', 'keywords')
+            $articleModel->fresh()
+                ->load([
+                    'publication.media',
+                    'publication.admin',
+                    'keywords',
+                ])
         );
     }
 
@@ -113,9 +176,16 @@ class ArticleController extends Controller
     {
         $article->load('publication.media');
 
-        $article->keywords()->detach();
+        DB::transaction(function () use ($article) {
+            $publication = $article->publication;
+            $media = $publication?->media;
 
-        $article->publication->delete();
+            $article->keywords()->detach();
+
+            $article->delete();
+            $publication?->delete();
+            $media?->delete();
+        });
 
         return response()->json(null, 204);
     }

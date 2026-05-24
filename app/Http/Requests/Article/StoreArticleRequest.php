@@ -32,7 +32,7 @@ class StoreArticleRequest extends FormRequest
 
             'image_url' => [
                 'required',
-                'url',
+                'string',
                 'max:2048',
             ],
 

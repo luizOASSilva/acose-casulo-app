@@ -12,7 +12,7 @@ class StoreDocumentRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return (bool) ($this->user('admin') ?? $this->user());
     }
 
     /**
@@ -36,6 +36,43 @@ class StoreDocumentRequest extends FormRequest
                 'max:2048',
                 'regex:/^https:\/\//',
             ],
+
+            'category_id' => [
+                'required',
+                'integer',
+                'exists:document_categories,id',
+            ],
+
+            'year' => [
+                'required',
+                'integer',
+                'min:2000',
+                'max:' . (date('Y') + 1),
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'title.required' => 'Informe o título do documento.',
+            'title.min' => 'O título deve ter pelo menos 3 caracteres.',
+            'title.max' => 'O título deve ter no máximo 255 caracteres.',
+
+            'file_url.required' => 'Informe o link do documento.',
+            'file_url.url' => 'Informe uma URL válida para o documento.',
+            'file_url.regex' => 'O link do documento precisa começar com https://.',
+            'file_url.max' => 'O link do documento está muito longo.',
+
+            'category_id.required' => 'Selecione uma categoria.',
+            'category_id.integer' => 'A categoria selecionada é inválida.',
+            'category_id.exists' => 'A categoria selecionada não existe.',
+
+            'year.required' => 'Informe o ano do documento.',
+            'year.integer' => 'O ano precisa ser um número válido.',
+            'year.min' => 'O ano informado é muito antigo.',
+            'year.max' => 'O ano informado é inválido.',
         ];
     }
 }
+

@@ -8,6 +8,7 @@ use App\Http\Resources\MediaFileResource;
 use App\Models\Activity;
 use App\Models\Article;
 use App\Models\MediaFile;
+use App\Models\Partner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -60,7 +61,7 @@ class MediaLibraryController extends Controller
             'original_name' => $file->getClientOriginalName(),
             'filename' => $filename,
             'path' => $path,
-            'url' => Storage::url($path),
+            'url' => asset(Storage::url($path)),
             'mime_type' => $file->getMimeType(),
             'size' => $file->getSize() ?: 0,
             'created_by' => $request->user('admin')?->id,
@@ -86,7 +87,7 @@ class MediaLibraryController extends Controller
         );
 
         abort_if(
-            $this->isMediaInUse($mediaFile->url),
+            $this->isMediaInUse($mediaFile),
             422,
             'Essa imagem está em uso. Remova ou troque a imagem do conteúdo antes de apagar.'
         );
@@ -120,16 +121,31 @@ class MediaLibraryController extends Controller
         );
     }
 
-    private function isMediaInUse(string $url): bool
+    private function isMediaInUse(MediaFile $mediaFile): bool
     {
+        $absoluteUrl = $mediaFile->url;
+        $relativeUrl = Storage::url($mediaFile->path);
+
         return Article::query()
-            ->whereHas('publication.media', function ($query) use ($url) {
-                $query->where('url', $url);
+            ->whereHas('publication.media', function ($query) use ($absoluteUrl, $relativeUrl) {
+                $query
+                    ->where('url', $absoluteUrl)
+                    ->orWhere('url', $relativeUrl);
             })
             ->exists()
             || Activity::query()
-                ->whereHas('publication.media', function ($query) use ($url) {
-                    $query->where('url', $url);
+                ->whereHas('publication.media', function ($query) use ($absoluteUrl, $relativeUrl) {
+                    $query
+                        ->where('url', $absoluteUrl)
+                        ->orWhere('url', $relativeUrl);
+                })
+                ->exists()
+            || Partner::query()
+                ->where(function ($query) use ($absoluteUrl, $relativeUrl, $mediaFile) {
+                    $query
+                        ->where('logo_path', $mediaFile->path)
+                        ->orWhere('logo_path', $absoluteUrl)
+                        ->orWhere('logo_path', $relativeUrl);
                 })
                 ->exists();
     }

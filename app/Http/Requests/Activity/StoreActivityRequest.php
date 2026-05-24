@@ -30,7 +30,7 @@ class StoreActivityRequest extends FormRequest
 
             'image_url' => [
                 'required',
-                'url',
+                'string',
                 'max:2048',
             ],
 
@@ -66,7 +66,6 @@ class StoreActivityRequest extends FormRequest
             'schedules.*.end_time' => [
                 'required',
                 'date_format:H:i',
-                'after:schedules.*.start_time',
             ],
         ];
     }
@@ -83,6 +82,15 @@ class StoreActivityRequest extends FormRequest
                         empty($schedule['start_time']) ||
                         empty($schedule['end_time'])
                     ) {
+                        continue;
+                    }
+
+                    if ($schedule['end_time'] <= $schedule['start_time']) {
+                        $validator->errors()->add(
+                            "schedules.$index.end_time",
+                            'O horário de fim deve ser depois do horário de início.'
+                        );
+
                         continue;
                     }
 
@@ -105,9 +113,17 @@ class StoreActivityRequest extends FormRequest
                         }
 
                         if (
-                            ($schedule['weekday'] ?? null) === ($otherSchedule['weekday'] ?? null) &&
-                            ($schedule['start_time'] ?? null) < ($otherSchedule['end_time'] ?? null) &&
-                            ($schedule['end_time'] ?? null) > ($otherSchedule['start_time'] ?? null)
+                            empty($otherSchedule['weekday']) ||
+                            empty($otherSchedule['start_time']) ||
+                            empty($otherSchedule['end_time'])
+                        ) {
+                            continue;
+                        }
+
+                        if (
+                            $schedule['weekday'] === $otherSchedule['weekday'] &&
+                            $schedule['start_time'] < $otherSchedule['end_time'] &&
+                            $schedule['end_time'] > $otherSchedule['start_time']
                         ) {
                             $validator->errors()->add(
                                 "schedules.$index.start_time",
@@ -120,4 +136,3 @@ class StoreActivityRequest extends FormRequest
         ];
     }
 }
-
