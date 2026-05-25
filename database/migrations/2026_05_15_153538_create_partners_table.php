@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('admin_id')->constrained('admins')->onDelete('cascade');
             $table->string('name');
             $table->string('logo_path')->nullable();
+            $table->string('logo_alt')->nullable();
             $table->string('website_url')->nullable();
             $table->string('bg_color')->default('#ffffff');
             $table->integer('order')->default(0);
@@ -26,4 +27,3 @@ return new class extends Migration
         Schema::dropIfExists('partners');
     }
 };
-

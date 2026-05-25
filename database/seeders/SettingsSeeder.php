@@ -16,7 +16,7 @@ class SettingsSeeder extends Seeder
                 'label' => 'Logo do site',
                 'description' => 'URL ou caminho público da logo exibida no site.',
                 'type' => 'url',
-                'value' => '/images/logo.svg',
+                'value' => '/logo.svg',
                 'is_public' => true,
                 'sort_order' => 1,
             ],

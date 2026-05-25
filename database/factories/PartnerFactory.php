@@ -9,10 +9,13 @@ class PartnerFactory extends Factory
 {
     public function definition(): array
     {
+        $name = fake()->company();
+
         return [
             'admin_id' => Admin::factory(),
-            'name' => fake()->company(),
+            'name' => $name,
             'logo_path' => 'media/partners/placeholder.svg',
+            'logo_alt' => 'Logo de ' . $name,
             'website_url' => fake()->optional(0.8)->url(),
             'bg_color' => fake()->randomElement([
                 '#ffffff',

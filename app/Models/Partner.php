@@ -14,6 +14,7 @@ class Partner extends Model
         'admin_id',
         'name',
         'logo_path',
+        'logo_alt',
         'website_url',
         'bg_color',
         'order',

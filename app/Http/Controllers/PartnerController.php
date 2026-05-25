@@ -34,7 +34,8 @@ class PartnerController extends Controller
         $partner = Partner::query()->create([
             'admin_id' => $request->user('admin')?->id,
             'name' => $validated['name'],
-            'logo_path' => $this->normalizeLogoPath($validated['logo_url']),
+            'logo_path' => $this->normalizeLogoPath($validated['logo_path']),
+            'logo_alt' => $validated['logo_alt'] ?? null,
             'website_url' => $validated['website_url'] ?? null,
             'bg_color' => $validated['bg_color'] ?? '#ffffff',
             'order' => $validated['order'] ?? 0,
@@ -58,8 +59,12 @@ class PartnerController extends Controller
             $data['name'] = $validated['name'];
         }
 
-        if (array_key_exists('logo_url', $validated)) {
-            $data['logo_path'] = $this->normalizeLogoPath($validated['logo_url']);
+        if (array_key_exists('logo_path', $validated)) {
+            $data['logo_path'] = $this->normalizeLogoPath($validated['logo_path']);
+        }
+
+        if (array_key_exists('logo_alt', $validated)) {
+            $data['logo_alt'] = $validated['logo_alt'];
         }
 
         if (array_key_exists('website_url', $validated)) {
@@ -94,16 +99,20 @@ class PartnerController extends Controller
         ]);
     }
 
-    private function normalizeLogoPath(string $logoUrl): string
+    private function normalizeLogoPath(string $logoPath): string
     {
-        if (Str::startsWith($logoUrl, asset('storage/'))) {
-            return Str::after($logoUrl, asset('storage/'));
+        if (Str::startsWith($logoPath, asset('storage/'))) {
+            return Str::after($logoPath, asset('storage/'));
         }
 
-        if (Str::startsWith($logoUrl, '/storage/')) {
-            return Str::after($logoUrl, '/storage/');
+        if (Str::startsWith($logoPath, '/storage/')) {
+            return Str::after($logoPath, '/storage/');
         }
 
-        return $logoUrl;
+        if (Str::startsWith($logoPath, 'storage/')) {
+            return Str::after($logoPath, 'storage/');
+        }
+
+        return $logoPath;
     }
 }

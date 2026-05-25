@@ -20,6 +20,7 @@ class PartnerResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'logo_path' => $this->logo_path,
+            'logo_alt' => $this->logo_alt,
             'logo_url' => $this->logoUrl(),
             'website_url' => $this->website_url,
             'bg_color' => $this->bg_color ?? '#ffffff',
@@ -40,14 +41,10 @@ class PartnerResource extends JsonResource
             return null;
         }
 
-        if (
-            Str::startsWith($this->logo_path, 'http://') ||
-            Str::startsWith($this->logo_path, 'https://') ||
-            Str::startsWith($this->logo_path, '/storage/')
-        ) {
+        if (Str::startsWith($this->logo_path, ['http://', 'https://', '/storage/'])) {
             return $this->logo_path;
         }
 
-        return Storage::url($this->logo_path);
+        return Storage::disk('public')->url($this->logo_path);
     }
 }

@@ -21,10 +21,16 @@ class StorePartnerRequest extends FormRequest
                 'max:255',
             ],
 
-            'logo_url' => [
+            'logo_path' => [
                 'required',
                 'string',
                 'max:2048',
+            ],
+
+            'logo_alt' => [
+                'nullable',
+                'string',
+                'max:255',
             ],
 
             'website_url' => [
@@ -60,9 +66,12 @@ class StorePartnerRequest extends FormRequest
             'name.min' => 'O nome do parceiro deve ter ao menos 2 caracteres.',
             'name.max' => 'O nome do parceiro deve ter no máximo 255 caracteres.',
 
-            'logo_url.required' => 'Selecione ou envie uma logo para o parceiro.',
-            'logo_url.string' => 'A logo selecionada é inválida.',
-            'logo_url.max' => 'O caminho da logo deve ter no máximo 2048 caracteres.',
+            'logo_path.required' => 'Selecione ou envie uma logo para o parceiro.',
+            'logo_path.string' => 'A logo selecionada é inválida.',
+            'logo_path.max' => 'O caminho da logo deve ter no máximo 2048 caracteres.',
+
+            'logo_alt.string' => 'O texto alternativo da logo deve ser um texto.',
+            'logo_alt.max' => 'O texto alternativo deve ter no máximo 255 caracteres.',
 
             'website_url.url' => 'Informe uma URL válida para o site do parceiro.',
             'website_url.max' => 'A URL do site deve ter no máximo 2048 caracteres.',
@@ -77,4 +86,3 @@ class StorePartnerRequest extends FormRequest
         ];
     }
 }
-
