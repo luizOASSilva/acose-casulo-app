@@ -17,18 +17,78 @@ use Illuminate\Support\Str;
 
 class ActivityController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $query = Activity::query()
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])
+            ->withCount('likes');
+
+        if ($request->filled('q')) {
+            $search = trim((string) $request->input('q'));
+
+            $query->whereHas('publication', function ($publicationQuery) use ($search) {
+                $publicationQuery
+                    ->where('title', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('weekday')) {
+            $query->whereHas('schedules', function ($scheduleQuery) use ($request) {
+                $scheduleQuery->where('weekday', $request->input('weekday'));
+            });
+        }
+
+        if ($request->filled('start_time') || $request->filled('end_time')) {
+            $query->whereHas('schedules', function ($scheduleQuery) use ($request) {
+                if ($request->filled('weekday')) {
+                    $scheduleQuery->where('weekday', $request->input('weekday'));
+                }
+
+                $startTime = $request->input('start_time');
+                $endTime = $request->input('end_time');
+
+                if ($startTime && $endTime) {
+                    $scheduleQuery
+                        ->where('start_time', '<', $endTime)
+                        ->where('end_time', '>', $startTime);
+
+                    return;
+                }
+
+                if ($startTime) {
+                    $scheduleQuery->where('start_time', '>=', $startTime);
+                    return;
+                }
+
+                if ($endTime) {
+                    $scheduleQuery->where('end_time', '<=', $endTime);
+                }
+            });
+        }
+
+        match ($request->input('sort', 'recent')) {
+            'oldest' => $query->oldest('activities.created_at'),
+
+            'az' => $query
+                ->join('publications', 'activities.publication_id', '=', 'publications.id')
+                ->orderBy('publications.title')
+                ->select('activities.*'),
+
+            'likes' => $query->orderByDesc('likes_count'),
+
+            default => $query->latest('activities.created_at'),
+        };
+
+        $perPage = (int) $request->input('per_page', 12);
+        $perPage = max(1, min($perPage, 24));
+
         return ActivityResource::collection(
-            Activity::query()
-                ->with([
-                    'publication.media',
-                    'publication.admin',
-                    'schedules',
-                ])
-                ->withCount('likes')
-                ->latest()
-                ->paginate(12)
+            $query->paginate($perPage)->withQueryString()
         );
     }
 

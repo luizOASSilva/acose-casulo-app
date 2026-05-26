@@ -153,6 +153,9 @@ Route::middleware('auth:admin')->group(function () {
     Route::apiResource('document-categories', DocumentCategoryController::class)
         ->only(['store', 'update', 'destroy']);
 
+    Route::get('/admin/partners', [PartnerController::class, 'index']);
+    Route::get('/admin/partners/{partner}', [PartnerController::class, 'show']);
+
     Route::apiResource('partners', PartnerController::class)
         ->only(['store', 'update', 'destroy']);
 

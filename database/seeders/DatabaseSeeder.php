@@ -62,7 +62,7 @@ class DatabaseSeeder extends Seeder
 
     private function createArticlesWithStorageImages(Admin $admin, $keywords): void
     {
-        $articles = Article::factory(5)->create();
+        $articles = Article::factory(10)->create();
 
         $articles->each(function (Article $article, int $index) use ($keywords, $admin) {
             $article->keywords()->attach(

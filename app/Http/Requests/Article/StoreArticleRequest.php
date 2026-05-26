@@ -9,7 +9,7 @@ class StoreArticleRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return (bool) $this->user('admin');
     }
 
     /**

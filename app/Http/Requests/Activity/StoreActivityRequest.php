@@ -10,7 +10,7 @@ class StoreActivityRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return (bool) $this->user('admin');
     }
 
     public function rules(): array

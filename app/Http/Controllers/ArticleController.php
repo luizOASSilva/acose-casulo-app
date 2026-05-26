@@ -9,20 +9,58 @@ use App\Models\Article;
 use App\Models\Keyword;
 use App\Models\Media;
 use App\Models\Publication;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ArticleController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return ArticleResource::collection(
-            Article::with([
+        $query = Article::query()
+            ->with([
                 'publication.media',
                 'publication.admin',
                 'keywords',
-            ])
-                ->latest()
-                ->paginate(12)
+            ]);
+
+        if ($request->filled('q')) {
+            $search = trim((string) $request->input('q'));
+
+            $query->where(function ($articleQuery) use ($search) {
+                $articleQuery
+                    ->where('summary', 'like', "%{$search}%")
+                    ->orWhereHas('publication', function ($publicationQuery) use ($search) {
+                        $publicationQuery
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('keyword')) {
+            $keyword = trim((string) $request->input('keyword'));
+
+            $query->whereHas('keywords', function ($keywordQuery) use ($keyword) {
+                $keywordQuery->where('word', $keyword);
+            });
+        }
+
+        match ($request->input('sort', 'recent')) {
+            'oldest' => $query->oldest('articles.created_at'),
+
+            'az' => $query
+                ->join('publications', 'articles.publication_id', '=', 'publications.id')
+                ->orderBy('publications.title')
+                ->select('articles.*'),
+
+            default => $query->latest('articles.created_at'),
+        };
+
+        $perPage = (int) $request->input('per_page', 12);
+        $perPage = max(1, min($perPage, 24));
+
+        return ArticleResource::collection(
+            $query->paginate($perPage)->withQueryString()
         );
     }
 

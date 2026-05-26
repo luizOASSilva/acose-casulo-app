@@ -13,7 +13,7 @@ class UpdateDocumentRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return (bool) ($this->user('admin') ?? $this->user());
+        return (bool) $this->user('admin');
     }
 
     /**

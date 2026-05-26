@@ -15,16 +15,65 @@ class PartnerController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $partners = Partner::query()
-            ->with('admin')
-            ->when(! $request->user('admin'), function ($query) {
-                $query->where('is_active', true);
-            })
-            ->orderBy('order')
-            ->orderBy('name')
-            ->get();
+        $isAdmin = (bool) $request->user('admin');
 
-        return PartnerResource::collection($partners);
+        $query = Partner::query()
+            ->with('admin')
+            ->when(! $isAdmin, function ($query) {
+                $query->where('is_active', true);
+            });
+
+        if ($request->filled('q')) {
+            $search = trim((string) $request->input('q'));
+
+            $query->where(function ($query) use ($search) {
+                $query
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('website_url', 'like', "%{$search}%");
+            });
+        }
+
+        if ($isAdmin && $request->filled('status')) {
+            $status = (string) $request->input('status');
+
+            if ($status === 'active') {
+                $query->where('is_active', true);
+            }
+
+            if ($status === 'inactive') {
+                $query->where('is_active', false);
+            }
+        }
+
+        $query
+            ->orderBy('order')
+            ->orderBy('name');
+
+        if ($request->filled('per_page') || $request->filled('page')) {
+            $perPage = (int) $request->input('per_page', 18);
+            $perPage = max(1, min($perPage, 48));
+
+            return PartnerResource::collection(
+                $query->paginate($perPage)->withQueryString()
+            );
+        }
+
+        return PartnerResource::collection(
+            $query->get()
+        );
+    }
+
+    public function show(Request $request, Partner $partner): PartnerResource
+    {
+        abort_if(
+            ! $request->user('admin') && ! $partner->is_active,
+            404,
+            'Parceiro não encontrado.'
+        );
+
+        return new PartnerResource(
+            $partner->load('admin')
+        );
     }
 
     public function store(StorePartnerRequest $request): PartnerResource
