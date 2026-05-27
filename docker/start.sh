@@ -4,6 +4,7 @@ set -e
 echo "Preparando pastas..."
 
 mkdir -p /var/www/html/storage/logs
+mkdir -p /var/www/html/storage/app/public
 mkdir -p /var/www/html/storage/framework/sessions
 mkdir -p /var/www/html/storage/framework/cache
 mkdir -p /var/www/html/storage/framework/views
@@ -11,6 +12,10 @@ mkdir -p /var/www/html/bootstrap/cache
 
 chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+echo "Criando link público do storage..."
+rm -rf /var/www/html/public/storage
+ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
 
 ln -sf /dev/stdout /var/www/html/storage/logs/laravel.log
 
@@ -54,7 +59,7 @@ echo "Testando Nginx..."
 nginx -t
 
 echo "Iniciando scheduler..."
-(while true; do php artisan schedule:run; sleep 60; done) &
+(while true; do php artisan schedule:run --quiet; sleep 60; done) &
 
 echo "Iniciando PHP-FPM..."
 php-fpm -D
