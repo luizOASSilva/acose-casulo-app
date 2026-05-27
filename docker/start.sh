@@ -4,8 +4,10 @@ set -e
 echo "======================================"
 echo "INICIANDO CONTAINER LARAVEL"
 echo "RUN_SEEDERS=${RUN_SEEDERS:-false}"
-echo "SEEDER_CLASS=${SEEDER_CLASS:-DatabaseSeeder}"
+echo "SEEDER_CLASS=${SEEDER_CLASS:-}"
 echo "RUN_FRESH_MIGRATIONS=${RUN_FRESH_MIGRATIONS:-false}"
+echo "FILESYSTEM_DISK=${FILESYSTEM_DISK:-}"
+echo "APP_URL=${APP_URL:-}"
 echo "======================================"
 
 echo "Preparando pastas..."
@@ -17,22 +19,34 @@ mkdir -p /var/www/html/storage/framework/cache
 mkdir -p /var/www/html/storage/framework/views
 mkdir -p /var/www/html/bootstrap/cache
 
-chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
 echo "Criando link público do storage..."
 rm -rf /var/www/html/public/storage
 ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
 
+echo "Ajustando permissões..."
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
 ln -sf /dev/stdout /var/www/html/storage/logs/laravel.log
 
-echo "Limpando caches Laravel..."
-php artisan optimize:clear || true
+echo "Testando escrita no storage público com www-data..."
+if su -s /bin/sh www-data -c "touch /var/www/html/storage/app/public/.write-test && rm -f /var/www/html/storage/app/public/.write-test"; then
+    echo "Storage público gravável por www-data."
+else
+    echo "ERRO: www-data não consegue escrever em storage/app/public."
+    echo "Listando permissões para diagnóstico:"
+    ls -la /var/www/html || true
+    ls -la /var/www/html/storage || true
+    ls -la /var/www/html/storage/app || true
+    ls -la /var/www/html/storage/app/public || true
+fi
+
+echo "Limpando caches Laravel sem depender da tabela cache..."
 php artisan config:clear || true
-php artisan cache:clear || true
-php artisan view:clear || true
 php artisan route:clear || true
+php artisan view:clear || true
 php artisan event:clear || true
+php artisan clear-compiled || true
 
 if [ "${RUN_FRESH_MIGRATIONS:-false}" = "true" ]; then
     echo "ATENÇÃO: RUN_FRESH_MIGRATIONS=true detectado."
@@ -67,13 +81,27 @@ else
     fi
 fi
 
-echo "Limpando caches após migrations/seeders..."
-php artisan optimize:clear || true
+echo "Limpando caches após migrations/seeders sem depender da tabela cache..."
 php artisan config:clear || true
-php artisan cache:clear || true
-php artisan view:clear || true
 php artisan route:clear || true
+php artisan view:clear || true
 php artisan event:clear || true
+php artisan clear-compiled || true
+
+echo "Garantindo permissões finais do storage..."
+mkdir -p /var/www/html/storage/app/public
+rm -rf /var/www/html/public/storage
+ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+echo "Testando escrita final no storage público com www-data..."
+if su -s /bin/sh www-data -c "touch /var/www/html/storage/app/public/.write-test-final && rm -f /var/www/html/storage/app/public/.write-test-final"; then
+    echo "Storage público final OK."
+else
+    echo "ERRO FINAL: www-data ainda não consegue escrever em storage/app/public."
+    ls -la /var/www/html/storage/app/public || true
+fi
 
 echo "Cacheando config..."
 php artisan config:cache
