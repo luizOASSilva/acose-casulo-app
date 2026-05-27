@@ -38,11 +38,15 @@ class ArticleController extends Controller
         }
 
         if ($request->filled('keyword')) {
-            $keyword = trim((string) $request->input('keyword'));
+            $keywordTerms = $this->parseKeywordTerms(
+                (string) $request->input('keyword')
+            );
 
-            $query->whereHas('keywords', function ($keywordQuery) use ($keyword) {
-                $keywordQuery->where('word', $keyword);
-            });
+            foreach ($keywordTerms as $keyword) {
+                $query->whereHas('keywords', function ($keywordQuery) use ($keyword) {
+                    $keywordQuery->where('word', 'like', "%{$keyword}%");
+                });
+            }
         }
 
         match ($request->input('sort', 'recent')) {
@@ -226,5 +230,26 @@ class ArticleController extends Controller
         });
 
         return response()->json(null, 204);
+    }
+
+    private function parseKeywordTerms(string $value): array
+    {
+        $normalized = str($value)
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[,\s]+/', ' ')
+            ->trim()
+            ->value();
+
+        if ($normalized === '') {
+            return [];
+        }
+
+        return collect(explode(' ', $normalized))
+            ->map(fn ($term) => trim($term))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }
