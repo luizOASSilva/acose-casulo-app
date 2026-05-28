@@ -37,11 +37,32 @@ class DashboardResource extends JsonResource
             'recent_activity' => collect($this['recent_activity'] ?? [])
                 ->map(function ($item) {
                     return [
-                        'type' => $item['type'] ?? 'system',
+                        'id' => $item['id'] ?? null,
+
+                        'admin' => [
+                            'id' => data_get($item, 'admin.id'),
+                            'name' => data_get($item, 'admin.name', 'Sistema'),
+                        ],
+
+                        'action' => $item['action'] ?? 'system',
+                        'type' => $item['action'] ?? 'system',
+
+                        'subject' => [
+                            'type' => data_get($item, 'subject.type'),
+                            'id' => data_get($item, 'subject.id'),
+                            'name' => data_get($item, 'subject.name'),
+                        ],
+
                         'title' => $item['title'] ?? 'Atividade registrada',
                         'description' => $item['description'] ?? '',
+
+                        'properties' => $item['properties'] ?? [],
+
+                        'ip_address' => $item['ip_address'] ?? null,
+
                         'time' => $item['time'] ?? '—',
-                        'date' => $item['date'] ?? null,
+                        'date' => $item['created_at'] ?? $item['date'] ?? null,
+                        'created_at' => $item['created_at'] ?? $item['date'] ?? null,
                     ];
                 })
                 ->values()

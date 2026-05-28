@@ -10,6 +10,7 @@ use App\Models\ActivityLike;
 use App\Models\ActivitySchedule;
 use App\Models\Media;
 use App\Models\Publication;
+use App\Support\AdminAudit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -196,7 +197,7 @@ class ActivityController extends Controller
             ->withCount('likes')
             ->firstOrFail();
 
-        DB::transaction(function () use ($validated, $activityModel) {
+        $activityModel = DB::transaction(function () use ($validated, $activityModel) {
             $activityModel->load('publication.media');
 
             if (
@@ -224,17 +225,33 @@ class ActivityController extends Controller
                 $activityModel->schedules()->delete();
                 $activityModel->schedules()->createMany($validated['schedules']);
             }
+
+            return $activityModel->fresh([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])->loadCount('likes');
         });
 
-        return ActivityResource::make(
-            $activityModel->fresh()
-                ->load([
-                    'publication.media',
-                    'publication.admin',
-                    'schedules',
-                ])
-                ->loadCount('likes')
+        $activityTitle = $activityModel->publication?->title
+            ?? 'Atividade #' . $activityModel->id;
+
+        $adminName = ($request->user('admin') ?? $request->user())?->name ?? 'Sistema';
+
+        AdminAudit::log(
+            request: $request,
+            action: 'activity.updated',
+            subject: $activityModel,
+            title: 'Atividade atualizada',
+            description: $adminName . ' atualizou a atividade "' . $activityTitle . '".',
+            properties: [
+                'activity_id' => $activityModel->id,
+                'title' => $activityTitle,
+                'changed_fields' => array_keys($validated),
+            ]
         );
+
+        return ActivityResource::make($activityModel);
     }
 
     public function destroy(Activity $activity)

@@ -9,6 +9,7 @@ use App\Models\Article;
 use App\Models\Keyword;
 use App\Models\Media;
 use App\Models\Publication;
+use App\Support\AdminAudit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -160,7 +161,7 @@ class ArticleController extends Controller
             ])
             ->firstOrFail();
 
-        DB::transaction(function () use ($validated, $articleModel) {
+        $articleModel = DB::transaction(function () use ($validated, $articleModel) {
             $articleModel->load('publication.media');
 
             if (
@@ -202,16 +203,33 @@ class ArticleController extends Controller
 
                 $articleModel->keywords()->sync($keywordIds);
             }
+
+            return $articleModel->fresh([
+                'publication.media',
+                'publication.admin',
+                'keywords',
+            ]);
         });
 
-        return ArticleResource::make(
-            $articleModel->fresh()
-                ->load([
-                    'publication.media',
-                    'publication.admin',
-                    'keywords',
-                ])
+        $articleTitle = $articleModel->publication?->title
+            ?? 'Artigo #' . $articleModel->id;
+
+        $adminName = ($request->user('admin') ?? $request->user())?->name ?? 'Sistema';
+
+        AdminAudit::log(
+            request: $request,
+            action: 'article.updated',
+            subject: $articleModel,
+            title: 'Artigo atualizado',
+            description: $adminName . ' atualizou o artigo "' . $articleTitle . '".',
+            properties: [
+                'article_id' => $articleModel->id,
+                'title' => $articleTitle,
+                'changed_fields' => array_keys($validated),
+            ]
         );
+
+        return ArticleResource::make($articleModel);
     }
 
     public function destroy(Article $article)

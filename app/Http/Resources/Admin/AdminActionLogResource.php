@@ -16,9 +16,11 @@ class AdminActionLogResource extends JsonResource
             'admin' => [
                 'id' => $this->admin_id,
                 'name' => $this->admin_name ?: 'Sistema',
+                'role' => $this->getAdminRole(),
             ],
 
             'action' => $this->action,
+            'type' => $this->action,
 
             'subject' => [
                 'type' => $this->subject_type,
@@ -34,8 +36,18 @@ class AdminActionLogResource extends JsonResource
             'ip_address' => $this->ip_address,
 
             'time' => $this->formatTime($this->created_at),
+            'date' => optional($this->created_at)->toISOString(),
             'created_at' => optional($this->created_at)->toISOString(),
         ];
+    }
+
+    private function getAdminRole(): ?string
+    {
+        if ($this->relationLoaded('admin') && $this->admin) {
+            return $this->admin->role ?? null;
+        }
+
+        return null;
     }
 
     private function formatTime($date): string
@@ -44,14 +56,16 @@ class AdminActionLogResource extends JsonResource
             return '—';
         }
 
-        $date = Carbon::parse($date)->locale('pt_BR');
+        $date = Carbon::parse($date)
+            ->timezone(config('app.timezone'))
+            ->locale('pt_BR');
 
         if ($date->isToday()) {
             return 'Hoje às ' . $date->format('H:i');
         }
 
         if ($date->isYesterday()) {
-            return 'Ontem';
+            return 'Ontem às ' . $date->format('H:i');
         }
 
         return $date->diffForHumans();

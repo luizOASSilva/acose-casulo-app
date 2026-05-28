@@ -16,6 +16,7 @@ use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\Settings\SettingController;
 use App\Http\Controllers\Media\MediaLibraryController;
+use App\Http\Controllers\Admin\AdminActionLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -115,6 +116,8 @@ Route::middleware('auth:admin')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/admin/action-logs', [AdminActionLogController::class, 'index']);
+    Route::get('/admin/action-logs/filters', [AdminActionLogController::class, 'filters']);
 
     /*
     |--------------------------------------------------------------------------

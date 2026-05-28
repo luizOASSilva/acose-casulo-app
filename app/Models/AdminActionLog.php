@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AdminActionLog extends Model
@@ -24,6 +25,11 @@ class AdminActionLog extends Model
     protected $casts = [
         'properties' => 'array',
     ];
+
+    public function admin(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class);
+    }
 
     public function subject(): MorphTo
     {
