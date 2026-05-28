@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminEmailChangeController;
 use App\Http\Controllers\Admin\DashboardController;
 
 use App\Http\Controllers\ArticleController;
@@ -24,6 +25,17 @@ use App\Http\Controllers\Admin\AdminActionLogController;
 |--------------------------------------------------------------------------
 */
 Route::post('/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:10,1');
+
+/*
+|--------------------------------------------------------------------------
+| Confirmação Pública de Troca de E-mail de Admin
+|--------------------------------------------------------------------------
+| O link é aberto pelo frontend Next.js e o frontend envia o token para cá.
+| Fica fora do auth porque o token já é assinado/hasheado, expira e só pode
+| ser usado uma vez.
+*/
+Route::post('/admins/email-change/confirm', [AdminEmailChangeController::class, 'confirm'])
     ->middleware('throttle:10,1');
 
 /*
@@ -176,6 +188,8 @@ Route::middleware('auth:admin')->group(function () {
     */
     Route::middleware('admin.master')->group(function () {
         Route::apiResource('admins', AdminController::class);
+
+        Route::post('/admins/{admin}/email-change-request', [AdminEmailChangeController::class, 'request']);
 
         Route::get('/settings', [SettingController::class, 'index']);
         Route::put('/settings', [SettingController::class, 'update']);
