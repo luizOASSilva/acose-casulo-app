@@ -3,23 +3,39 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Donation;
+use App\Http\Resources\Admin\AdminActionLogResource;
+use App\Http\Resources\Admin\DashboardResource;
+use App\Models\Activity;
+use App\Models\AdminActionLog;
 use App\Models\Article;
+use App\Models\Document;
+use App\Models\Donation;
+use App\Models\MediaFile;
 use App\Models\Partner;
-use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $analyticsData = $this->getAnalyticsData();
 
-        $donationsToday = Donation::whereDate('created_at', Carbon::today())->count();
-        $donationsYesterday = Donation::whereDate('created_at', Carbon::yesterday())->count();
-        $donationGrowth = $this->calculateGrowth($donationsToday, $donationsYesterday);
+        $donationsToday = Donation::query()
+            ->whereDate('created_at', Carbon::today())
+            ->count();
 
-        return response()->json([
+        $donationsYesterday = Donation::query()
+            ->whereDate('created_at', Carbon::yesterday())
+            ->count();
+
+        $donationGrowth = $this->calculateGrowth(
+            $donationsToday,
+            $donationsYesterday
+        );
+
+        $data = [
             'analytics' => [
                 'visitors' => $analyticsData['visitors'],
                 'visitors_growth' => $analyticsData['growth'],
@@ -27,18 +43,39 @@ class DashboardController extends Controller
                 'donations_growth' => $donationGrowth . '%',
                 'articles_read' => $analyticsData['pageviews'],
                 'conversion' => $analyticsData['conversion'] . '%',
+                'conversion_growth' => '0%',
             ],
+
             'cms' => [
-                'articles' => Article::count(),
-                'partners' => Partner::count(),
-                'activities' => \App\Models\Activity::count(),
-                'documents' => \App\Models\Document::count(),
+                'articles' => Article::query()->count(),
+                'activities' => Activity::query()->count(),
+                'partners' => Partner::query()->count(),
+                'documents' => Document::query()->count(),
+                'media' => MediaFile::query()->count(),
             ],
+
             'status' => [
                 'api' => 'Online',
                 'analytics' => 'Indisponível',
-            ]
-        ]);
+            ],
+
+            'recent_activity' => $this->getRecentAdminActions($request),
+        ];
+
+        return response()->json(
+            DashboardResource::make($data)->resolve($request)
+        );
+    }
+
+    private function getRecentAdminActions(Request $request): array
+    {
+        $logs = AdminActionLog::query()
+            ->latest()
+            ->take(8)
+            ->get();
+
+        return AdminActionLogResource::collection($logs)
+            ->resolve($request);
     }
 
     private function getAnalyticsData(): array
@@ -58,8 +95,12 @@ class DashboardController extends Controller
 
     private function calculateGrowth($current, $previous): string
     {
-        if ($previous == 0) return $current > 0 ? '+100' : '0';
+        if ((int) $previous === 0) {
+            return (int) $current > 0 ? '+100' : '0';
+        }
+
         $growth = (($current - $previous) / $previous) * 100;
+
         return ($growth >= 0 ? '+' : '') . round($growth, 1);
     }
 }
