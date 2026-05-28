@@ -6,7 +6,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreAdminRequest extends FormRequest
+class UpdateAdminRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -23,8 +23,13 @@ class StoreAdminRequest extends FormRequest
      */
     public function rules(): array
     {
+        $admin = $this->route('admin');
+
+        $adminId = is_object($admin) ? $admin->id : $admin;
+
         return [
             'name' => [
+                'sometimes',
                 'required',
                 'string',
                 'min:3',
@@ -32,20 +37,28 @@ class StoreAdminRequest extends FormRequest
             ],
 
             'email' => [
+                'sometimes',
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('admins', 'email'),
+                Rule::unique('admins', 'email')->ignore($adminId),
             ],
 
             'role' => [
+                'sometimes',
                 'required',
                 'string',
                 Rule::in(['master', 'admin']),
             ],
 
+            'is_active' => [
+                'sometimes',
+                'boolean',
+            ],
+
             'password' => [
-                'required',
+                'sometimes',
+                'nullable',
                 'string',
                 'min:8',
                 'confirmed',

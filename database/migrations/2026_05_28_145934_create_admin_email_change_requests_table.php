@@ -29,8 +29,15 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['target_admin_id', 'confirmed_at']);
-            $table->index(['requested_by_admin_id', 'confirmed_at']);
+            $table->index(
+                ['target_admin_id', 'confirmed_at'],
+                'admin_email_change_target_idx'
+            );
+
+            $table->index(
+                ['requested_by_admin_id', 'confirmed_at'],
+                'admin_email_change_requester_idx'
+            );
         });
     }
 

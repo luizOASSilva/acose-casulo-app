@@ -8,6 +8,8 @@ use App\Http\Requests\Admin\UpdateAdminRequest;
 use App\Http\Resources\Admin\AdminResource;
 use App\Models\Admin;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -22,7 +24,17 @@ class AdminController extends Controller
 
     public function store(StoreAdminRequest $request)
     {
-        $admin = Admin::create($request->validated());
+        $data = $request->validated();
+
+        if (empty($data['password'])) {
+            $data['password'] = Hash::make(Str::random(32));
+        } else {
+            $data['password'] = Hash::make($data['password']);
+        }
+
+        unset($data['password_confirmation']);
+
+        $admin = Admin::create($data);
 
         return AdminResource::make($admin)
             ->response()
@@ -38,9 +50,15 @@ class AdminController extends Controller
     {
         $data = $request->validated();
 
-        if (empty($data['password'])) {
-            unset($data['password']);
+        if (array_key_exists('password', $data)) {
+            if (empty($data['password'])) {
+                unset($data['password']);
+            } else {
+                $data['password'] = Hash::make($data['password']);
+            }
         }
+
+        unset($data['password_confirmation']);
 
         $admin->update($data);
 
@@ -60,4 +78,3 @@ class AdminController extends Controller
         return response()->json(null, 204);
     }
 }
-

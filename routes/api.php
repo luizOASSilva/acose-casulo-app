@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminCreationRequestController;
 use App\Http\Controllers\Admin\AdminEmailChangeController;
 use App\Http\Controllers\Admin\DashboardController;
 
@@ -36,6 +37,19 @@ Route::post('/auth/login', [AuthController::class, 'login'])
 | ser usado uma vez.
 */
 Route::post('/admins/email-change/confirm', [AdminEmailChangeController::class, 'confirm'])
+    ->middleware('throttle:10,1');
+
+/*
+|--------------------------------------------------------------------------
+| Confirmação Pública de Criação de Admin
+|--------------------------------------------------------------------------
+| O master recebe um link por e-mail, o frontend abre uma tela de revisão
+| e então chama estas rotas com o token da solicitação.
+*/
+Route::get('/admins/creation-request', [AdminCreationRequestController::class, 'show'])
+    ->middleware('throttle:20,1');
+
+Route::post('/admins/creation-request/confirm', [AdminCreationRequestController::class, 'confirm'])
     ->middleware('throttle:10,1');
 
 /*
@@ -189,6 +203,7 @@ Route::middleware('auth:admin')->group(function () {
     Route::middleware('admin.master')->group(function () {
         Route::apiResource('admins', AdminController::class);
 
+        Route::post('/admins/create-request', [AdminCreationRequestController::class, 'request']);
         Route::post('/admins/{admin}/email-change-request', [AdminEmailChangeController::class, 'request']);
 
         Route::get('/settings', [SettingController::class, 'index']);

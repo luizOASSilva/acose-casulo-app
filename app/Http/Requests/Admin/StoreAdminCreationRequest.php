@@ -6,19 +6,14 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreAdminRequest extends FormRequest
+class StoreAdminCreationRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return $this->user()?->role === 'master';
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -41,21 +36,27 @@ class StoreAdminRequest extends FormRequest
             'role' => [
                 'required',
                 'string',
-                Rule::in(['master', 'admin']),
+                Rule::in(['admin', 'master']),
             ],
 
             'is_active' => [
                 'sometimes',
                 'boolean',
             ],
+        ];
+    }
 
-            'password' => [
-                'sometimes',
-                'nullable',
-                'string',
-                'min:8',
-                'confirmed',
-            ],
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Nome é obrigatório.',
+            'name.min' => 'Nome deve ter ao menos 3 caracteres.',
+            'email.required' => 'E-mail é obrigatório.',
+            'email.email' => 'Informe um e-mail válido.',
+            'email.unique' => 'Este e-mail já está em uso por outro administrador.',
+            'role.required' => 'Nível de acesso é obrigatório.',
+            'role.in' => 'Nível de acesso inválido.',
+            'is_active.boolean' => 'Status inválido.',
         ];
     }
 }
