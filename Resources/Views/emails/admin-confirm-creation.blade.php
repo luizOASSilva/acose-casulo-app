@@ -5,6 +5,26 @@
     <title>Confirme a criação de administrador</title>
 </head>
 <body style="font-family: Arial, sans-serif; color: #171717; line-height: 1.5;">
+    <div style="margin-bottom: 22px;">
+        @if($logoPath)
+            <img
+                src="{{ $message->embed($logoPath) }}"
+                alt="Projeto Casulo"
+                style="display: block; max-width: 180px; max-height: 72px; width: auto; height: auto;"
+            >
+        @elseif($logoUrl)
+            <img
+                src="{{ $logoUrl }}"
+                alt="Projeto Casulo"
+                style="display: block; max-width: 180px; max-height: 72px; width: auto; height: auto;"
+            >
+        @else
+            <div style="font-size: 20px; font-weight: bold; color: #bf4f00;">
+                Projeto Casulo
+            </div>
+        @endif
+    </div>
+
     <h2>Confirme a criação de um novo administrador</h2>
 
     <p>Olá, {{ $masterAdmin->name }}.</p>

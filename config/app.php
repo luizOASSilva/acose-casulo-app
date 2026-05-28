@@ -60,11 +60,26 @@ return [
     |--------------------------------------------------------------------------
     |
     | URL do frontend Next.js usada para gerar links enviados por e-mail,
-    | como confirmação de troca de e-mail de administrador.
+    | como confirmação de criação de admin, troca de e-mail e redefinição
+    | de senha.
     |
     */
 
     'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Panel Slug
+    |--------------------------------------------------------------------------
+    |
+    | Slug secreto usado na URL do painel administrativo no frontend.
+    | Exemplo:
+    | /acesso/{panel_slug}
+    | /acesso/{panel_slug}/redefinir-senha?token=...
+    |
+    */
+
+    'panel_slug' => env('PANEL_SLUG'),
 
     /*
     |--------------------------------------------------------------------------

@@ -24,32 +24,42 @@ class AdminCreationRequestController extends Controller
 
         $email = strtolower(trim($validated['email']));
 
-        $pendingExists = AdminCreationRequest::query()
-            ->where('email', $email)
-            ->whereNull('confirmed_at')
-            ->where('expires_at', '>', now())
-            ->exists();
-
-        if ($pendingExists) {
+        if (
+            Admin::query()
+                ->whereRaw('LOWER(email) = ?', [$email])
+                ->exists()
+        ) {
             return response()->json([
-                'message' => 'Já existe uma solicitação pendente para este e-mail.',
+                'message' => 'Este e-mail já está em uso por outro administrador.',
             ], 422);
         }
 
         $plainToken = Str::random(64);
         $tokenHash = hash('sha256', $plainToken);
 
-        $creationRequest = AdminCreationRequest::create([
-            'requested_by_admin_id' => $master->id,
-            'name' => trim($validated['name']),
-            'email' => $email,
-            'role' => $validated['role'],
-            'is_active' => $validated['is_active'] ?? true,
-            'token_hash' => $tokenHash,
-            'expires_at' => now()->addMinutes(30),
-        ]);
+        $creationRequest = DB::transaction(function () use (
+            $master,
+            $validated,
+            $email,
+            $tokenHash
+        ) {
+            AdminCreationRequest::query()
+                ->where('email', $email)
+                ->whereNull('confirmed_at')
+                ->delete();
 
-        $confirmationUrl = config('app.frontend_url', config('app.url'))
+            return AdminCreationRequest::create([
+                'requested_by_admin_id' => $master->id,
+                'name' => trim($validated['name']),
+                'email' => $email,
+                'role' => Admin::ROLE_ADMIN,
+                'is_active' => $validated['is_active'] ?? true,
+                'token_hash' => $tokenHash,
+                'expires_at' => now()->addMinutes(30),
+            ]);
+        });
+
+        $confirmationUrl = rtrim(config('app.frontend_url', config('app.url')), '/')
             . '/admin/configuracoes/confirmar-criacao-admin?token='
             . urlencode($plainToken);
 
@@ -62,7 +72,7 @@ class AdminCreationRequestController extends Controller
         );
 
         return response()->json([
-            'message' => 'Enviamos um e-mail para o master confirmar a criação deste usuário. O novo administrador ainda não tem acesso ao painel.',
+            'message' => 'Enviamos um e-mail para você confirmar a criação deste usuário. Se havia um link anterior para este mesmo e-mail, ele foi cancelado.',
         ]);
     }
 
@@ -74,7 +84,7 @@ class AdminCreationRequestController extends Controller
 
         if (!$creationRequest) {
             return response()->json([
-                'message' => 'Token inválido.',
+                'message' => 'Token inválido ou substituído por uma solicitação mais recente.',
             ], 404);
         }
 
@@ -95,7 +105,7 @@ class AdminCreationRequestController extends Controller
                 'name' => $creationRequest->name,
                 'email' => $creationRequest->email,
                 'role' => $creationRequest->role,
-                'is_active' => $creationRequest->is_active,
+                'is_active' => (bool) $creationRequest->is_active,
                 'expires_at' => $creationRequest->expires_at?->toISOString(),
                 'requested_by' => [
                     'name' => $creationRequest->requestedByAdmin?->name,
@@ -113,7 +123,7 @@ class AdminCreationRequestController extends Controller
 
         if (!$creationRequest) {
             return response()->json([
-                'message' => 'Token inválido.',
+                'message' => 'Token inválido ou substituído por uma solicitação mais recente.',
             ], 404);
         }
 
@@ -129,9 +139,11 @@ class AdminCreationRequestController extends Controller
             ], 422);
         }
 
+        $email = strtolower(trim($creationRequest->email));
+
         if (
             Admin::query()
-                ->where('email', $creationRequest->email)
+                ->whereRaw('LOWER(email) = ?', [$email])
                 ->exists()
         ) {
             return response()->json([
@@ -139,18 +151,25 @@ class AdminCreationRequestController extends Controller
             ], 422);
         }
 
-        $admin = DB::transaction(function () use ($creationRequest) {
+        $admin = DB::transaction(function () use ($creationRequest, $email) {
             $admin = Admin::create([
                 'name' => $creationRequest->name,
-                'email' => $creationRequest->email,
-                'role' => $creationRequest->role,
-                'is_active' => $creationRequest->is_active,
+                'email' => $email,
+                'role' => Admin::ROLE_ADMIN,
+                'is_active' => (bool) $creationRequest->is_active,
                 'password' => Hash::make(Str::random(64)),
             ]);
 
             $creationRequest->forceFill([
+                'role' => Admin::ROLE_ADMIN,
                 'confirmed_at' => now(),
             ])->save();
+
+            AdminCreationRequest::query()
+                ->where('email', $email)
+                ->whereNull('confirmed_at')
+                ->where('id', '!=', $creationRequest->id)
+                ->delete();
 
             return $admin;
         });
@@ -166,7 +185,7 @@ class AdminCreationRequestController extends Controller
                 'name' => $admin->name,
                 'email' => $admin->email,
                 'role' => $admin->role,
-                'is_active' => $admin->is_active,
+                'is_active' => (bool) $admin->is_active,
             ],
         ]);
     }

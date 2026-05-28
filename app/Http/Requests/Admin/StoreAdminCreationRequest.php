@@ -33,12 +33,6 @@ class StoreAdminCreationRequest extends FormRequest
                 Rule::unique('admins', 'email'),
             ],
 
-            'role' => [
-                'required',
-                'string',
-                Rule::in(['admin', 'master']),
-            ],
-
             'is_active' => [
                 'sometimes',
                 'boolean',
@@ -54,8 +48,6 @@ class StoreAdminCreationRequest extends FormRequest
             'email.required' => 'E-mail é obrigatório.',
             'email.email' => 'Informe um e-mail válido.',
             'email.unique' => 'Este e-mail já está em uso por outro administrador.',
-            'role.required' => 'Nível de acesso é obrigatório.',
-            'role.in' => 'Nível de acesso inválido.',
             'is_active.boolean' => 'Status inválido.',
         ];
     }

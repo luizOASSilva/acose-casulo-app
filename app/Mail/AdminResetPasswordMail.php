@@ -3,13 +3,12 @@
 namespace App\Mail;
 
 use App\Models\Admin;
-use App\Models\AdminCreationRequest;
 use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class ConfirmAdminCreationMail extends Mailable
+class AdminResetPasswordMail extends Mailable
 {
     use Queueable;
     use SerializesModels;
@@ -18,9 +17,8 @@ class ConfirmAdminCreationMail extends Mailable
     public ?string $logoUrl = null;
 
     public function __construct(
-        public AdminCreationRequest $creationRequest,
-        public Admin $masterAdmin,
-        public string $confirmationUrl
+        public Admin $admin,
+        public string $resetUrl
     ) {
         $this->logoPath = Setting::emailLogoPath();
         $this->logoUrl = Setting::emailLogoUrl();
@@ -29,7 +27,7 @@ class ConfirmAdminCreationMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject('Confirme a criação de um novo administrador')
-            ->view('emails.admin-confirm-creation');
+            ->subject('Redefinição de senha do painel administrativo')
+            ->view('emails.admin-reset-password');
     }
 }

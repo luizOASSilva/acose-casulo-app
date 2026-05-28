@@ -13,6 +13,7 @@ class AdminFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'role' => Admin::ROLE_ADMIN,
+            'is_active' => true,
             'password' => 'password',
         ];
     }
@@ -21,6 +22,7 @@ class AdminFactory extends Factory
     {
         return $this->state(fn () => [
             'role' => Admin::ROLE_MASTER,
+            'is_active' => true,
         ]);
     }
 
@@ -28,7 +30,14 @@ class AdminFactory extends Factory
     {
         return $this->state(fn () => [
             'role' => Admin::ROLE_ADMIN,
+            'is_active' => true,
+        ]);
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn () => [
+            'is_active' => false,
         ]);
     }
 }
-

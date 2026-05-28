@@ -15,20 +15,31 @@ class AuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
-        $admin = Admin::where('email', $request->email)->first();
+        $email = strtolower(trim($validated['email']));
 
-        if (! $admin || ! Hash::check($request->password, $admin->password)) {
+        $admin = Admin::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
+
+        if (!$admin || !Hash::check($validated['password'], $admin->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Credenciais inválidas.'],
             ]);
         }
 
+        if (!$admin->is_active) {
+            return response()->json([
+                'message' => 'Este usuário está inativo.',
+            ], 403);
+        }
+
         Auth::guard('web')->login($admin);
+
         $request->session()->regenerate();
 
         return response()->json([
@@ -39,6 +50,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         Auth::guard('web')->logout();
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
@@ -49,8 +61,27 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        $admin = $request->user();
+
+        if (!$admin) {
+            return response()->json([
+                'message' => 'Não autenticado.',
+            ], 401);
+        }
+
+        if (!$admin->is_active) {
+            Auth::guard('web')->logout();
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json([
+                'message' => 'Este usuário está inativo.',
+            ], 403);
+        }
+
         return response()->json(
-            AdminResource::make($request->user())
+            AdminResource::make($admin)
         );
     }
 }

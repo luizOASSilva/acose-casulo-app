@@ -26,6 +26,9 @@ class AdminController extends Controller
     {
         $data = $request->validated();
 
+        $data['role'] = Admin::ROLE_ADMIN;
+        $data['is_active'] = $data['is_active'] ?? true;
+
         if (empty($data['password'])) {
             $data['password'] = Hash::make(Str::random(32));
         } else {
@@ -50,6 +53,16 @@ class AdminController extends Controller
     {
         $data = $request->validated();
 
+        if (
+            array_key_exists('is_active', $data) &&
+            auth('admin')->id() === $admin->id &&
+            filter_var($data['is_active'], FILTER_VALIDATE_BOOLEAN) === false
+        ) {
+            return response()->json([
+                'message' => 'Você não pode inativar o próprio usuário logado.',
+            ], 422);
+        }
+
         if (array_key_exists('password', $data)) {
             if (empty($data['password'])) {
                 unset($data['password']);
@@ -70,6 +83,12 @@ class AdminController extends Controller
         if (auth('admin')->id() === $admin->id) {
             return response()->json([
                 'message' => 'Você não pode remover o próprio usuário logado.',
+            ], 422);
+        }
+
+        if ($admin->role === Admin::ROLE_MASTER) {
+            return response()->json([
+                'message' => 'O usuário master principal não pode ser removido.',
             ], 422);
         }
 

@@ -38,12 +38,6 @@ class StoreAdminRequest extends FormRequest
                 Rule::unique('admins', 'email'),
             ],
 
-            'role' => [
-                'required',
-                'string',
-                Rule::in(['master', 'admin']),
-            ],
-
             'is_active' => [
                 'sometimes',
                 'boolean',

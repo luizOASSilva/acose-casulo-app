@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminCreationRequestController;
 use App\Http\Controllers\Admin\AdminEmailChangeController;
+use App\Http\Controllers\Admin\AdminPasswordResetController;
 use App\Http\Controllers\Admin\DashboardController;
 
 use App\Http\Controllers\ArticleController;
@@ -22,10 +23,16 @@ use App\Http\Controllers\Admin\AdminActionLogController;
 
 /*
 |--------------------------------------------------------------------------
-| Autenticação (Login)
+| Autenticação
 |--------------------------------------------------------------------------
 */
 Route::post('/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:10,1');
+
+Route::post('/auth/forgot-password', [AdminPasswordResetController::class, 'forgot'])
+    ->middleware('throttle:5,1');
+
+Route::post('/auth/reset-password', [AdminPasswordResetController::class, 'reset'])
     ->middleware('throttle:10,1');
 
 /*
@@ -57,7 +64,6 @@ Route::post('/admins/creation-request/confirm', [AdminCreationRequestController:
 | Rotas Públicas (Site Institucional)
 |--------------------------------------------------------------------------
 */
-
 Route::get('/settings/public', [SettingController::class, 'public']);
 
 Route::get('/articles/recent', [ArticleController::class, 'recent']);

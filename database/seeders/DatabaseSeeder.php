@@ -32,10 +32,20 @@ class DatabaseSeeder extends Seeder
         $admin = Admin::factory()->master()->create([
             'name' => 'Admin Test',
             'email' => 'admin@test.com',
+            'role' => Admin::ROLE_MASTER,
+            'is_active' => true,
             'password' => 'password',
         ]);
 
-        Admin::factory(2)->admin()->create();
+        Admin::factory(2)->admin()->create([
+            'is_active' => true,
+        ]);
+
+        Admin::factory()->admin()->inactive()->create([
+            'name' => 'Admin Inativo Teste',
+            'email' => 'admin-inativo@test.com',
+            'password' => 'password',
+        ]);
 
         $keywords = Keyword::factory(10)->create();
 

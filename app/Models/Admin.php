@@ -18,6 +18,7 @@ class Admin extends Authenticatable
         'name',
         'email',
         'role',
+        'is_active',
         'password',
     ];
 
@@ -30,6 +31,7 @@ class Admin extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -41,6 +43,11 @@ class Admin extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->is_active;
     }
 
     public function partners(): HasMany

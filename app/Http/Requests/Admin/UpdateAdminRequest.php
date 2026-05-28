@@ -44,13 +44,6 @@ class UpdateAdminRequest extends FormRequest
                 Rule::unique('admins', 'email')->ignore($adminId),
             ],
 
-            'role' => [
-                'sometimes',
-                'required',
-                'string',
-                Rule::in(['master', 'admin']),
-            ],
-
             'is_active' => [
                 'sometimes',
                 'boolean',
