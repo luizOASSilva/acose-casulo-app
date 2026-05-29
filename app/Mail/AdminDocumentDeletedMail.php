@@ -2,14 +2,20 @@
 
 namespace App\Mail;
 
+use App\Models\Setting;
 use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 class AdminDocumentDeletedMail extends Mailable
 {
     use Queueable, SerializesModels;
+
+    public ?string $logoPath = null;
+
+    public ?string $logoUrl = null;
 
     public function __construct(
         public readonly string $documentName,
@@ -21,6 +27,7 @@ class AdminDocumentDeletedMail extends Mailable
         public readonly int|string|null $year,
         public readonly CarbonInterface $deletedAt,
     ) {
+        $this->prepareLogo();
     }
 
     public function build(): self
@@ -37,6 +44,43 @@ class AdminDocumentDeletedMail extends Mailable
                 'categoryName' => $this->categoryName,
                 'year' => $this->year,
                 'deletedAt' => $this->deletedAt,
+                'logoPath' => $this->logoPath,
+                'logoUrl' => $this->logoUrl,
             ]);
+    }
+
+    private function prepareLogo(): void
+    {
+        $logo = Setting::query()
+            ->where('key', 'site_logo_url')
+            ->value('value');
+
+        if (! $logo) {
+            return;
+        }
+
+        if (
+            str_starts_with($logo, 'http://') ||
+            str_starts_with($logo, 'https://') ||
+            str_starts_with($logo, 'data:')
+        ) {
+            $this->logoUrl = $logo;
+
+            return;
+        }
+
+        $path = ltrim($logo, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, strlen('storage/'));
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            $this->logoPath = Storage::disk('public')->path($path);
+
+            return;
+        }
+
+        $this->logoUrl = $logo;
     }
 }
