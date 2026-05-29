@@ -2,9 +2,14 @@
 
 namespace App\Observers;
 
+use App\Mail\AdminDocumentDeletedMail;
+use App\Models\Admin;
 use App\Models\Document;
 use App\Services\AdminActionLogger;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class DocumentObserver implements ShouldHandleEventsAfterCommit
 {
@@ -68,9 +73,49 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             properties: [
                 'document_id' => $document->id,
                 'category_id' => $document->document_category_id ?? null,
+                'category_name' => $this->getDocumentCategoryName($document),
                 'year' => $document->year ?? null,
             ]
         );
+
+        $this->notifyDocumentDeleted($document, $name);
+    }
+
+    private function notifyDocumentDeleted(Document $document, string $name): void
+    {
+        try {
+            $recipients = Admin::query()
+                ->where('role', Admin::ROLE_MASTER)
+                ->where('is_active', true)
+                ->pluck('email')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($recipients->isEmpty()) {
+                return;
+            }
+
+            Mail::to($recipients->all())->send(
+                new AdminDocumentDeletedMail(
+                    documentName: $name,
+                    documentId: $document->id,
+                    deletedByName: $this->adminName(),
+                    deletedByEmail: auth('admin')->user()?->email,
+                    categoryId: $document->document_category_id ?? null,
+                    categoryName: $this->getDocumentCategoryName($document),
+                    year: $document->year ?? null,
+                    deletedAt: now()
+                )
+            );
+        } catch (Throwable $exception) {
+            Log::error('Erro ao enviar e-mail de documento removido.', [
+                'document_id' => $document->id,
+                'document_name' => $name,
+                'deleted_by_admin_id' => auth('admin')->id(),
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function getDocumentName(Document $document): string
@@ -79,6 +124,21 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             ?: $document->name
             ?: $document->filename
             ?: 'Documento #' . $document->id;
+    }
+
+    private function getDocumentCategoryName(Document $document): ?string
+    {
+        if ($document->relationLoaded('category')) {
+            return $document->category?->name
+                ?: $document->category?->title;
+        }
+
+        if ($document->relationLoaded('documentCategory')) {
+            return $document->documentCategory?->name
+                ?: $document->documentCategory?->title;
+        }
+
+        return null;
     }
 
     private function shouldLog(): bool
