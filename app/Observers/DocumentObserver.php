@@ -19,6 +19,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
+        $document->loadMissing('category');
+
         $name = $this->getDocumentName($document);
 
         AdminActionLogger::log(
@@ -29,7 +31,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             subjectName: $name,
             properties: [
                 'document_id' => $document->id,
-                'category_id' => $document->document_category_id ?? null,
+                'category_id' => $document->category_id ?? null,
+                'category_name' => $this->getDocumentCategoryName($document),
                 'year' => $document->year ?? null,
             ]
         );
@@ -41,6 +44,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
+        $document->loadMissing('category');
+
         $name = $this->getDocumentName($document);
 
         AdminActionLogger::log(
@@ -51,6 +56,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             subjectName: $name,
             properties: [
                 'document_id' => $document->id,
+                'category_id' => $document->category_id ?? null,
+                'category_name' => $this->getDocumentCategoryName($document),
                 'changed_fields' => $this->changedFields($document),
             ]
         );
@@ -62,7 +69,11 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
+        $document->loadMissing('category');
+
         $name = $this->getDocumentName($document);
+        $categoryName = $this->getDocumentCategoryName($document);
+        $admin = auth('admin')->user();
 
         AdminActionLogger::log(
             action: 'document.deleted',
@@ -72,17 +83,27 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
             subjectName: $name,
             properties: [
                 'document_id' => $document->id,
-                'category_id' => $document->document_category_id ?? null,
-                'category_name' => $this->getDocumentCategoryName($document),
+                'category_id' => $document->category_id ?? null,
+                'category_name' => $categoryName,
                 'year' => $document->year ?? null,
+                'deleted_by_admin_id' => $admin?->id,
+                'deleted_by_name' => $admin?->name,
+                'deleted_by_email' => $admin?->email,
             ]
         );
 
-        $this->notifyDocumentDeleted($document, $name);
+        $this->notifyDocumentDeleted(
+            document: $document,
+            name: $name,
+            categoryName: $categoryName
+        );
     }
 
-    private function notifyDocumentDeleted(Document $document, string $name): void
-    {
+    private function notifyDocumentDeleted(
+        Document $document,
+        string $name,
+        ?string $categoryName
+    ): void {
         try {
             $recipients = Admin::query()
                 ->where('role', Admin::ROLE_MASTER)
@@ -96,14 +117,16 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                 return;
             }
 
+            $admin = auth('admin')->user();
+
             Mail::to($recipients->all())->send(
                 new AdminDocumentDeletedMail(
                     documentName: $name,
                     documentId: $document->id,
-                    deletedByName: $this->adminName(),
-                    deletedByEmail: auth('admin')->user()?->email,
-                    categoryId: $document->document_category_id ?? null,
-                    categoryName: $this->getDocumentCategoryName($document),
+                    deletedByName: $admin?->name ?: 'Administrador',
+                    deletedByEmail: $admin?->email,
+                    categoryId: $document->category_id ?? null,
+                    categoryName: $categoryName,
                     year: $document->year ?? null,
                     deletedAt: now()
                 )
@@ -121,24 +144,18 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
     private function getDocumentName(Document $document): string
     {
         return $document->title
-            ?: $document->name
-            ?: $document->filename
+            ?: basename((string) $document->file_url)
             ?: 'Documento #' . $document->id;
     }
 
     private function getDocumentCategoryName(Document $document): ?string
     {
-        if ($document->relationLoaded('category')) {
-            return $document->category?->name
-                ?: $document->category?->title;
+        if (! $document->relationLoaded('category')) {
+            return null;
         }
 
-        if ($document->relationLoaded('documentCategory')) {
-            return $document->documentCategory?->name
-                ?: $document->documentCategory?->title;
-        }
-
-        return null;
+        return $document->category?->name
+            ?: $document->category?->title;
     }
 
     private function shouldLog(): bool
