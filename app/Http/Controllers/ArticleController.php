@@ -9,7 +9,7 @@ use App\Models\Article;
 use App\Models\Keyword;
 use App\Models\Media;
 use App\Models\Publication;
-use App\Support\AdminAudit;
+use App\Services\ArticleAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -94,10 +94,12 @@ class ArticleController extends Controller
                 'caption' => $validated['image_caption'] ?? null,
             ]);
 
+            $admin = $request->user('admin') ?? $request->user();
+
             $publication = Publication::create([
                 'title' => $validated['title'],
                 'content' => $validated['content'],
-                'admin_id' => $request->user()->id,
+                'admin_id' => $admin?->id,
                 'media_id' => $media->id,
             ]);
 
@@ -111,13 +113,21 @@ class ArticleController extends Controller
                     ->filter()
                     ->map(fn ($word) => Keyword::firstOrCreate([
                         'word' => $word,
-                    ])->id);
+                    ])->id)
+                    ->values()
+                    ->all();
 
                 $article->keywords()->attach($keywordIds);
             }
 
-            return $article;
+            return $article->fresh([
+                'publication.media',
+                'publication.admin',
+                'keywords',
+            ]);
         });
+
+        ArticleAuditLogger::created($article, $request);
 
         return ArticleResource::make(
             $article->load([
@@ -161,8 +171,13 @@ class ArticleController extends Controller
             ])
             ->firstOrFail();
 
+        $before = ArticleAuditLogger::snapshot($articleModel);
+
         $articleModel = DB::transaction(function () use ($validated, $articleModel) {
-            $articleModel->load('publication.media');
+            $articleModel->load([
+                'publication.media',
+                'keywords',
+            ]);
 
             if (
                 array_key_exists('image_url', $validated) ||
@@ -199,7 +214,9 @@ class ArticleController extends Controller
                     ->filter()
                     ->map(fn ($word) => Keyword::firstOrCreate([
                         'word' => $word,
-                    ])->id);
+                    ])->id)
+                    ->values()
+                    ->all();
 
                 $articleModel->keywords()->sync($keywordIds);
             }
@@ -211,22 +228,13 @@ class ArticleController extends Controller
             ]);
         });
 
-        $articleTitle = $articleModel->publication?->title
-            ?? 'Artigo #' . $articleModel->id;
+        $after = ArticleAuditLogger::snapshot($articleModel);
 
-        $adminName = ($request->user('admin') ?? $request->user())?->name ?? 'Sistema';
-
-        AdminAudit::log(
-            request: $request,
-            action: 'article.updated',
-            subject: $articleModel,
-            title: 'Artigo atualizado',
-            description: $adminName . ' atualizou o artigo "' . $articleTitle . '".',
-            properties: [
-                'article_id' => $articleModel->id,
-                'title' => $articleTitle,
-                'changed_fields' => array_keys($validated),
-            ]
+        ArticleAuditLogger::updated(
+            article: $articleModel,
+            before: $before,
+            after: $after,
+            request: $request
         );
 
         return ArticleResource::make($articleModel);
@@ -234,9 +242,17 @@ class ArticleController extends Controller
 
     public function destroy(Article $article)
     {
-        $article->load('publication.media');
+        $article->load([
+            'publication.media',
+            'publication.admin',
+            'keywords',
+        ]);
 
-        DB::transaction(function () use ($article) {
+        $snapshot = ArticleAuditLogger::snapshot($article);
+
+        DB::transaction(function () use ($article, $snapshot) {
+            ArticleAuditLogger::deleted($article, $snapshot, request());
+
             $publication = $article->publication;
             $media = $publication?->media;
 

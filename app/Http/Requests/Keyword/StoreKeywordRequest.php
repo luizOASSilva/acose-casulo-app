@@ -4,6 +4,7 @@ namespace App\Http\Requests\Keyword;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreKeywordRequest extends FormRequest
 {
@@ -27,7 +28,9 @@ class StoreKeywordRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
+                Rule::unique('keywords', 'word'),
             ],
         ];
     }
 }
+

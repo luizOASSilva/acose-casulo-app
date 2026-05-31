@@ -15,7 +15,8 @@ class AdminActionLogResource extends JsonResource
 
             'admin' => [
                 'id' => $this->admin_id,
-                'name' => $this->admin_name ?: 'Sistema',
+                'name' => $this->getAdminName(),
+                'email' => $this->getAdminEmail(),
                 'role' => $this->getAdminRole(),
             ],
 
@@ -34,11 +35,30 @@ class AdminActionLogResource extends JsonResource
             'properties' => $this->properties ?? [],
 
             'ip_address' => $this->ip_address,
+            'user_agent' => $this->user_agent,
 
             'time' => $this->formatTime($this->created_at),
             'date' => optional($this->created_at)->toISOString(),
             'created_at' => optional($this->created_at)->toISOString(),
         ];
+    }
+
+    private function getAdminName(): string
+    {
+        if ($this->relationLoaded('admin') && $this->admin) {
+            return $this->admin->name ?: ($this->admin_name ?: 'Sistema');
+        }
+
+        return $this->admin_name ?: 'Sistema';
+    }
+
+    private function getAdminEmail(): ?string
+    {
+        if ($this->relationLoaded('admin') && $this->admin) {
+            return $this->admin->email ?? null;
+        }
+
+        return null;
     }
 
     private function getAdminRole(): ?string

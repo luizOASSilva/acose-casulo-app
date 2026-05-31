@@ -2,34 +2,31 @@
 
 namespace App\Observers;
 
-use App\Models\MediaFile;
+use App\Models\Keyword;
 use App\Services\AdminActionLogger;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 
-class MediaFileObserver implements ShouldHandleEventsAfterCommit
+class KeywordObserver implements ShouldHandleEventsAfterCommit
 {
-    public function created(MediaFile $mediaFile): void
+    public function created(Keyword $keyword): void
     {
         if (! $this->shouldLog()) {
             return;
         }
 
-        $name = $this->getMediaName($mediaFile);
-        $changedValues = $this->createdValues($mediaFile);
+        $name = $this->getKeywordName($keyword);
+
+        $changedValues = $this->createdValues($keyword);
 
         AdminActionLogger::log(
-            action: 'media.created',
-            title: 'Mídia enviada',
-            description: $this->adminName() . ' enviou a mídia "' . $name . '".',
-            subject: $mediaFile,
+            action: 'keyword.created',
+            title: 'Palavra-chave criada',
+            description: $this->adminName() . ' criou a palavra-chave "' . $name . '".',
+            subject: $keyword,
             subjectName: $name,
             properties: [
-                'media_file_id' => $mediaFile->id,
-                'collection' => $mediaFile->collection ?? null,
-                'disk' => $mediaFile->disk ?? null,
-                'filename' => $mediaFile->filename ?? null,
-                'mime_type' => $mediaFile->mime_type ?? null,
-                'size' => $mediaFile->size ?? null,
+                'keyword_id' => $keyword->id,
+                'word' => $keyword->word ?? null,
                 'changed_fields' => array_keys($changedValues),
                 'new_values' => $this->newValuesFromChanges($changedValues),
                 'changed_values' => $changedValues,
@@ -38,28 +35,29 @@ class MediaFileObserver implements ShouldHandleEventsAfterCommit
         );
     }
 
-    public function updated(MediaFile $mediaFile): void
+    public function updated(Keyword $keyword): void
     {
-        if (! $this->shouldLog() || ! $this->hasRelevantChanges($mediaFile)) {
+        if (! $this->shouldLog() || ! $this->hasRelevantChanges($keyword)) {
             return;
         }
 
-        $changedValues = $this->changedValues($mediaFile);
+        $changedValues = $this->changedValues($keyword);
 
         if (empty($changedValues)) {
             return;
         }
 
-        $name = $this->getMediaName($mediaFile);
+        $name = $this->getKeywordName($keyword);
 
         AdminActionLogger::log(
-            action: 'media.updated',
-            title: 'Mídia atualizada',
-            description: $this->adminName() . ' atualizou a mídia "' . $name . '".',
-            subject: $mediaFile,
+            action: 'keyword.updated',
+            title: 'Palavra-chave atualizada',
+            description: $this->adminName() . ' atualizou a palavra-chave "' . $name . '".',
+            subject: $keyword,
             subjectName: $name,
             properties: [
-                'media_file_id' => $mediaFile->id,
+                'keyword_id' => $keyword->id,
+                'word' => $keyword->word ?? null,
                 'changed_fields' => array_keys($changedValues),
                 'old_values' => $this->oldValuesFromChanges($changedValues),
                 'new_values' => $this->newValuesFromChanges($changedValues),
@@ -69,36 +67,32 @@ class MediaFileObserver implements ShouldHandleEventsAfterCommit
         );
     }
 
-    public function deleted(MediaFile $mediaFile): void
+    public function deleted(Keyword $keyword): void
     {
         if (! $this->shouldLog()) {
             return;
         }
 
-        $name = $this->getMediaName($mediaFile);
+        $name = $this->getKeywordName($keyword);
 
         AdminActionLogger::log(
-            action: 'media.deleted',
-            title: 'Mídia removida',
-            description: $this->adminName() . ' removeu a mídia "' . $name . '".',
-            subject: $mediaFile,
+            action: 'keyword.deleted',
+            title: 'Palavra-chave removida',
+            description: $this->adminName() . ' removeu a palavra-chave "' . $name . '".',
+            subject: $keyword,
             subjectName: $name,
             properties: [
-                'media_file_id' => $mediaFile->id,
-                'collection' => $mediaFile->collection ?? null,
-                'filename' => $mediaFile->filename ?? null,
-                'path' => $mediaFile->path ?? null,
-                'old_values' => $this->filledSnapshot($mediaFile),
+                'keyword_id' => $keyword->id,
+                'word' => $keyword->word ?? null,
+                'old_values' => $this->filledSnapshot($keyword),
                 'request' => $this->requestContext(),
             ]
         );
     }
 
-    private function getMediaName(MediaFile $mediaFile): string
+    private function getKeywordName(Keyword $keyword): string
     {
-        return $mediaFile->original_name
-            ?: $mediaFile->filename
-            ?: 'Mídia #' . $mediaFile->id;
+        return $keyword->word ?: 'Palavra-chave #' . $keyword->id;
     }
 
     private function shouldLog(): bool
@@ -111,35 +105,35 @@ class MediaFileObserver implements ShouldHandleEventsAfterCommit
         return auth('admin')->user()?->name ?: 'Administrador';
     }
 
-    private function hasRelevantChanges(MediaFile $mediaFile): bool
+    private function hasRelevantChanges(Keyword $keyword): bool
     {
-        return count($this->changedFields($mediaFile)) > 0;
+        return count($this->changedFields($keyword)) > 0;
     }
 
-    private function changedFields(MediaFile $mediaFile): array
+    private function changedFields(Keyword $keyword): array
     {
-        return collect(array_keys($mediaFile->getChanges()))
+        return collect(array_keys($keyword->getChanges()))
             ->reject(fn ($field) => in_array($field, $this->ignoredFields(), true))
             ->values()
             ->all();
     }
 
-    private function changedValues(MediaFile $mediaFile): array
+    private function changedValues(Keyword $keyword): array
     {
-        return collect($this->changedFields($mediaFile))
+        return collect($this->changedFields($keyword))
             ->mapWithKeys(fn ($field) => [
                 $field => [
-                    'old' => $mediaFile->getOriginal($field),
-                    'new' => $mediaFile->{$field},
+                    'old' => $keyword->getOriginal($field),
+                    'new' => $keyword->{$field},
                 ],
             ])
             ->reject(fn ($value) => $this->normalizeForCompare($value['old']) === $this->normalizeForCompare($value['new']))
             ->all();
     }
 
-    private function createdValues(MediaFile $mediaFile): array
+    private function createdValues(Keyword $keyword): array
     {
-        return collect($this->snapshot($mediaFile))
+        return collect($this->snapshot($keyword))
             ->reject(fn ($value) => $this->isEmptyValue($value))
             ->mapWithKeys(fn ($value, $field) => [
                 $field => [
@@ -168,28 +162,28 @@ class MediaFileObserver implements ShouldHandleEventsAfterCommit
             ->all();
     }
 
-    private function filledSnapshot(MediaFile $mediaFile): array
+    private function filledSnapshot(Keyword $keyword): array
     {
-        return collect($this->snapshot($mediaFile))
+        return collect($this->snapshot($keyword))
             ->reject(fn ($value) => $this->isEmptyValue($value))
             ->all();
     }
 
-    private function oldSnapshot(MediaFile $mediaFile): array
+    private function oldSnapshot(Keyword $keyword): array
     {
         return collect($this->auditableFields())
             ->mapWithKeys(fn ($field) => [
-                $field => $mediaFile->getOriginal($field),
+                $field => $keyword->getOriginal($field),
             ])
             ->reject(fn ($value) => $this->isEmptyValue($value))
             ->all();
     }
 
-    private function snapshot(MediaFile $mediaFile): array
+    private function snapshot(Keyword $keyword): array
     {
         return collect($this->auditableFields())
             ->mapWithKeys(fn ($field) => [
-                $field => $mediaFile->{$field},
+                $field => $keyword->{$field},
             ])
             ->all();
     }
@@ -198,16 +192,7 @@ class MediaFileObserver implements ShouldHandleEventsAfterCommit
     {
         return [
             'id',
-            'collection',
-            'disk',
-            'filename',
-            'original_name',
-            'path',
-            'url',
-            'mime_type',
-            'size',
-            'alt_text',
-            'caption',
+            'word',
         ];
     }
 

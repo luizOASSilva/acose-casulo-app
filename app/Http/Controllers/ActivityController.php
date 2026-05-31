@@ -10,7 +10,7 @@ use App\Models\ActivityLike;
 use App\Models\ActivitySchedule;
 use App\Models\Media;
 use App\Models\Publication;
-use App\Support\AdminAudit;
+use App\Services\ActivityAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -137,10 +137,12 @@ class ActivityController extends Controller
                 'caption' => $validated['image_caption'] ?? null,
             ]);
 
+            $admin = $request->user('admin') ?? $request->user();
+
             $publication = Publication::create([
                 'title' => $validated['title'],
                 'content' => $validated['content'],
-                'admin_id' => $request->user()->id,
+                'admin_id' => $admin?->id,
                 'media_id' => $media->id,
             ]);
 
@@ -150,8 +152,14 @@ class ActivityController extends Controller
 
             $activity->schedules()->createMany($validated['schedules']);
 
-            return $activity;
+            return $activity->fresh([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])->loadCount('likes');
         });
+
+        ActivityAuditLogger::created($activity, $request);
 
         return ActivityResource::make(
             $activity->load([
@@ -197,12 +205,17 @@ class ActivityController extends Controller
             ->withCount('likes')
             ->firstOrFail();
 
+        $before = ActivityAuditLogger::snapshot($activityModel);
+
         $activityModel = DB::transaction(function () use ($validated, $activityModel) {
-            $activityModel->load('publication.media');
+            $activityModel->load([
+                'publication.media',
+                'schedules',
+            ]);
 
             if (
-                isset($validated['image_url']) ||
-                isset($validated['image_description']) ||
+                array_key_exists('image_url', $validated) ||
+                array_key_exists('image_description', $validated) ||
                 array_key_exists('image_caption', $validated)
             ) {
                 $activityModel->publication->media->update([
@@ -214,7 +227,10 @@ class ActivityController extends Controller
                 ]);
             }
 
-            if (isset($validated['title']) || isset($validated['content'])) {
+            if (
+                array_key_exists('title', $validated) ||
+                array_key_exists('content', $validated)
+            ) {
                 $activityModel->publication->update([
                     'title' => $validated['title'] ?? $activityModel->publication->title,
                     'content' => $validated['content'] ?? $activityModel->publication->content,
@@ -233,22 +249,13 @@ class ActivityController extends Controller
             ])->loadCount('likes');
         });
 
-        $activityTitle = $activityModel->publication?->title
-            ?? 'Atividade #' . $activityModel->id;
+        $after = ActivityAuditLogger::snapshot($activityModel);
 
-        $adminName = ($request->user('admin') ?? $request->user())?->name ?? 'Sistema';
-
-        AdminAudit::log(
-            request: $request,
-            action: 'activity.updated',
-            subject: $activityModel,
-            title: 'Atividade atualizada',
-            description: $adminName . ' atualizou a atividade "' . $activityTitle . '".',
-            properties: [
-                'activity_id' => $activityModel->id,
-                'title' => $activityTitle,
-                'changed_fields' => array_keys($validated),
-            ]
+        ActivityAuditLogger::updated(
+            activity: $activityModel,
+            before: $before,
+            after: $after,
+            request: $request
         );
 
         return ActivityResource::make($activityModel);
@@ -256,9 +263,17 @@ class ActivityController extends Controller
 
     public function destroy(Activity $activity)
     {
-        $activity->load('publication.media');
+        $activity->load([
+            'publication.media',
+            'publication.admin',
+            'schedules',
+        ]);
 
-        DB::transaction(function () use ($activity) {
+        $snapshot = ActivityAuditLogger::snapshot($activity);
+
+        DB::transaction(function () use ($activity, $snapshot) {
+            ActivityAuditLogger::deleted($activity, $snapshot, request());
+
             $publication = $activity->publication;
             $media = $publication?->media;
 
@@ -284,7 +299,7 @@ class ActivityController extends Controller
             ?? $request->header('X-Visitor-ID')
             ?? $request->input('visitor_id');
 
-        if (!$visitorId) {
+        if (! $visitorId) {
             $visitorId = (string) Str::uuid();
         }
 
@@ -318,23 +333,12 @@ class ActivityController extends Controller
 
         $likesCount = $activityModel->likes()->count();
 
-        return response()
-            ->json([
-                'liked' => $liked,
-                'is_liked' => $liked,
-                'likes' => $likesCount,
-                'likes_count' => $likesCount,
-            ])
-            ->cookie(
-                'visitor_id',
-                $visitorId,
-                60 * 24 * 365,
-                null,
-                null,
-                $request->isSecure(),
-                true,
-                false,
-                'Lax'
-            );
+        return response()->json([
+            'liked' => $liked,
+            'is_liked' => $liked,
+            'likes' => $likesCount,
+            'likes_count' => $likesCount,
+            'visitor_id' => $visitorId,
+        ]);
     }
 }

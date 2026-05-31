@@ -8,9 +8,11 @@ use App\Http\Controllers\Admin\AdminCreationRequestController;
 use App\Http\Controllers\Admin\AdminEmailChangeController;
 use App\Http\Controllers\Admin\AdminPasswordResetController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\AdminActionLogController;
 
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DocumentCategoryController;
 use App\Http\Controllers\KeywordController;
@@ -19,7 +21,6 @@ use App\Http\Controllers\TransparencyController;
 use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\Settings\SettingController;
 use App\Http\Controllers\Media\MediaLibraryController;
-use App\Http\Controllers\Admin\AdminActionLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,9 +40,6 @@ Route::post('/auth/reset-password', [AdminPasswordResetController::class, 'reset
 |--------------------------------------------------------------------------
 | Confirmação Pública de Troca de E-mail de Admin
 |--------------------------------------------------------------------------
-| O link é aberto pelo frontend Next.js e o frontend envia o token para cá.
-| Fica fora do auth porque o token já é assinado/hasheado, expira e só pode
-| ser usado uma vez.
 */
 Route::post('/admins/email-change/confirm', [AdminEmailChangeController::class, 'confirm'])
     ->middleware('throttle:10,1');
@@ -50,8 +48,6 @@ Route::post('/admins/email-change/confirm', [AdminEmailChangeController::class, 
 |--------------------------------------------------------------------------
 | Confirmação Pública de Criação de Admin
 |--------------------------------------------------------------------------
-| O master recebe um link por e-mail, o frontend abre uma tela de revisão
-| e então chama estas rotas com o token da solicitação.
 */
 Route::get('/admins/creation-request', [AdminCreationRequestController::class, 'show'])
     ->middleware('throttle:20,1');
@@ -61,10 +57,13 @@ Route::post('/admins/creation-request/confirm', [AdminCreationRequestController:
 
 /*
 |--------------------------------------------------------------------------
-| Rotas Públicas (Site Institucional)
+| Rotas Públicas - Site Institucional
 |--------------------------------------------------------------------------
 */
 Route::get('/settings/public', [SettingController::class, 'public']);
+
+Route::post('/contact', [ContactController::class, 'store'])
+    ->middleware('throttle:5,1');
 
 Route::get('/articles/recent', [ArticleController::class, 'recent']);
 Route::get('/activities/recent', [ActivityController::class, 'recent']);
@@ -76,9 +75,6 @@ Route::get('/partners', [PartnerController::class, 'index']);
 |--------------------------------------------------------------------------
 | Curtida Pública de Atividade
 |--------------------------------------------------------------------------
-| IMPORTANTE:
-| Fica antes do apiResource('activities'), porque senão o Laravel pode tentar
-| interpretar "like" como parte da rota show.
 */
 Route::post('/activities/{activity}/like', [ActivityController::class, 'toggleLike'])
     ->middleware('throttle:30,1');
@@ -87,9 +83,6 @@ Route::post('/activities/{activity}/like', [ActivityController::class, 'toggleLi
 |--------------------------------------------------------------------------
 | Agenda de Atividades - Administrativo
 |--------------------------------------------------------------------------
-| IMPORTANTE:
-| Fica antes do apiResource('activities'), porque senão "schedules" pode ser
-| interpretado como parâmetro da rota show.
 */
 Route::get('/activities/schedules', [ActivityController::class, 'schedules'])
     ->middleware('auth:admin');
@@ -137,7 +130,7 @@ Route::post('/webhook/mercadopago', [DonationController::class, 'webhook']);
 
 /*
 |--------------------------------------------------------------------------
-| Rotas Privadas (Dashboard e Gestão)
+| Rotas Privadas - Dashboard e Gestão
 |--------------------------------------------------------------------------
 | Protegidas por Cookies HttpOnly via Sanctum.
 */
@@ -148,8 +141,6 @@ Route::middleware('auth:admin')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/dashboard', [DashboardController::class, 'index']);
-    Route::get('/admin/action-logs', [AdminActionLogController::class, 'index']);
-    Route::get('/admin/action-logs/filters', [AdminActionLogController::class, 'filters']);
 
     /*
     |--------------------------------------------------------------------------
@@ -188,6 +179,11 @@ Route::middleware('auth:admin')->group(function () {
     Route::apiResource('document-categories', DocumentCategoryController::class)
         ->only(['store', 'update', 'destroy']);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Parceiros - Administrativo
+    |--------------------------------------------------------------------------
+    */
     Route::get('/admin/partners', [PartnerController::class, 'index']);
     Route::get('/admin/partners/{partner}', [PartnerController::class, 'show']);
 
@@ -207,11 +203,34 @@ Route::middleware('auth:admin')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('admin.master')->group(function () {
+        /*
+        |--------------------------------------------------------------------------
+        | Auditoria Administrativa
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/admin/action-logs', [AdminActionLogController::class, 'index']);
+        Route::get('/admin/action-logs/filters', [AdminActionLogController::class, 'filters']);
+        Route::get('/admin/action-logs/{actionLog}', [AdminActionLogController::class, 'show']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Gestão de Administradores
+        |--------------------------------------------------------------------------
+        */
         Route::apiResource('admins', AdminController::class);
 
         Route::post('/admins/create-request', [AdminCreationRequestController::class, 'request']);
-        Route::post('/admins/{admin}/email-change-request', [AdminEmailChangeController::class, 'request']);
 
+        Route::post(
+            '/admins/{admin}/email-change-request',
+            [AdminEmailChangeController::class, 'request']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Configurações
+        |--------------------------------------------------------------------------
+        */
         Route::get('/settings', [SettingController::class, 'index']);
         Route::put('/settings', [SettingController::class, 'update']);
         Route::post('/settings/clear-cache', [SettingController::class, 'clearCache']);

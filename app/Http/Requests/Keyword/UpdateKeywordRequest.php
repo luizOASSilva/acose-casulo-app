@@ -4,6 +4,7 @@ namespace App\Http\Requests\Keyword;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateKeywordRequest extends FormRequest
 {
@@ -27,6 +28,7 @@ class UpdateKeywordRequest extends FormRequest
                 'sometimes',
                 'string',
                 'max:255',
+                Rule::unique('keywords', 'word')->ignore($this->route('keyword')),
             ],
         ];
     }

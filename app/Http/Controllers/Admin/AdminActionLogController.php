@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\AdminActionLogResource;
+use App\Models\Admin;
 use App\Models\AdminActionLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ class AdminActionLogController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
+        $this->ensureMaster();
+
         $query = AdminActionLog::query()
             ->with('admin')
             ->latest();
@@ -56,8 +59,19 @@ class AdminActionLogController extends Controller
         );
     }
 
+    public function show(AdminActionLog $actionLog): AdminActionLogResource
+    {
+        $this->ensureMaster();
+
+        $actionLog->loadMissing('admin');
+
+        return AdminActionLogResource::make($actionLog);
+    }
+
     public function filters(): JsonResponse
     {
+        $this->ensureMaster();
+
         $admins = AdminActionLog::query()
             ->select('admin_id', 'admin_name')
             ->whereNotNull('admin_id')
@@ -73,6 +87,59 @@ class AdminActionLogController extends Controller
 
         return response()->json([
             'admins' => $admins,
+            'types' => [
+                [
+                    'value' => 'article',
+                    'label' => 'Artigos',
+                ],
+                [
+                    'value' => 'activity',
+                    'label' => 'Atividades',
+                ],
+                [
+                    'value' => 'partner',
+                    'label' => 'Parceiros',
+                ],
+                [
+                    'value' => 'document',
+                    'label' => 'Documentos',
+                ],
+                [
+                    'value' => 'media',
+                    'label' => 'Mídias',
+                ],
+                [
+                    'value' => 'setting',
+                    'label' => 'Configurações',
+                ],
+                [
+                    'value' => 'keyword',
+                    'label' => 'Palavras-chave',
+                ],
+            ],
+            'operations' => [
+                [
+                    'value' => 'created',
+                    'label' => 'Criado/enviado',
+                ],
+                [
+                    'value' => 'updated',
+                    'label' => 'Editado',
+                ],
+                [
+                    'value' => 'deleted',
+                    'label' => 'Removido',
+                ],
+            ],
         ]);
+    }
+
+    private function ensureMaster(): void
+    {
+        abort_unless(
+            auth('admin')->check()
+                && auth('admin')->user()?->role === Admin::ROLE_MASTER,
+            403
+        );
     }
 }

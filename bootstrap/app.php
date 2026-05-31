@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->preventRequestForgery(except: [
             'activities/*/like',
             'webhook/mercadopago',
+            'contact',
         ]);
 
         $middleware->api(append: [

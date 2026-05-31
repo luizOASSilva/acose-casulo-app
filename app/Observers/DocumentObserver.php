@@ -22,6 +22,7 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
         $document->loadMissing('category');
 
         $name = $this->getDocumentName($document);
+        $changedValues = $this->createdValues($document);
 
         AdminActionLogger::log(
             action: 'document.created',
@@ -34,6 +35,10 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                 'category_id' => $document->category_id ?? null,
                 'category_name' => $this->getDocumentCategoryName($document),
                 'year' => $document->year ?? null,
+                'changed_fields' => array_keys($changedValues),
+                'new_values' => $this->newValuesFromChanges($changedValues),
+                'changed_values' => $changedValues,
+                'request' => $this->requestContext(),
             ]
         );
     }
@@ -41,6 +46,12 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
     public function updated(Document $document): void
     {
         if (! $this->shouldLog() || ! $this->hasRelevantChanges($document)) {
+            return;
+        }
+
+        $changedValues = $this->changedValues($document);
+
+        if (empty($changedValues)) {
             return;
         }
 
@@ -58,7 +69,11 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                 'document_id' => $document->id,
                 'category_id' => $document->category_id ?? null,
                 'category_name' => $this->getDocumentCategoryName($document),
-                'changed_fields' => $this->changedFields($document),
+                'changed_fields' => array_keys($changedValues),
+                'old_values' => $this->oldValuesFromChanges($changedValues),
+                'new_values' => $this->newValuesFromChanges($changedValues),
+                'changed_values' => $changedValues,
+                'request' => $this->requestContext(),
             ]
         );
     }
@@ -89,6 +104,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                 'deleted_by_admin_id' => $admin?->id,
                 'deleted_by_name' => $admin?->name,
                 'deleted_by_email' => $admin?->email,
+                'old_values' => $this->filledSnapshot($document),
+                'request' => $this->requestContext(),
             ]
         );
 
@@ -176,8 +193,140 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
     private function changedFields(Document $document): array
     {
         return collect(array_keys($document->getChanges()))
-            ->reject(fn ($field) => in_array($field, ['updated_at'], true))
+            ->reject(fn ($field) => in_array($field, $this->ignoredFields(), true))
             ->values()
             ->all();
+    }
+
+    private function changedValues(Document $document): array
+    {
+        return collect($this->changedFields($document))
+            ->mapWithKeys(fn ($field) => [
+                $field => [
+                    'old' => $document->getOriginal($field),
+                    'new' => $document->{$field},
+                ],
+            ])
+            ->reject(fn ($value) => $this->normalizeForCompare($value['old']) === $this->normalizeForCompare($value['new']))
+            ->all();
+    }
+
+    private function createdValues(Document $document): array
+    {
+        return collect($this->snapshot($document))
+            ->reject(fn ($value) => $this->isEmptyValue($value))
+            ->mapWithKeys(fn ($value, $field) => [
+                $field => [
+                    'old' => null,
+                    'new' => $value,
+                ],
+            ])
+            ->all();
+    }
+
+    private function oldValuesFromChanges(array $changedValues): array
+    {
+        return collect($changedValues)
+            ->mapWithKeys(fn ($value, $field) => [
+                $field => $value['old'] ?? null,
+            ])
+            ->all();
+    }
+
+    private function newValuesFromChanges(array $changedValues): array
+    {
+        return collect($changedValues)
+            ->mapWithKeys(fn ($value, $field) => [
+                $field => $value['new'] ?? null,
+            ])
+            ->all();
+    }
+
+    private function filledSnapshot(Document $document): array
+    {
+        return collect($this->snapshot($document))
+            ->reject(fn ($value) => $this->isEmptyValue($value))
+            ->all();
+    }
+
+    private function oldSnapshot(Document $document): array
+    {
+        return collect($this->auditableFields())
+            ->mapWithKeys(fn ($field) => [
+                $field => $document->getOriginal($field),
+            ])
+            ->reject(fn ($value) => $this->isEmptyValue($value))
+            ->all();
+    }
+
+    private function snapshot(Document $document): array
+    {
+        return collect($this->auditableFields())
+            ->mapWithKeys(fn ($field) => [
+                $field => $document->{$field},
+            ])
+            ->all();
+    }
+
+    private function auditableFields(): array
+    {
+        return [
+            'id',
+            'title',
+            'description',
+            'file_url',
+            'file_path',
+            'filename',
+            'original_name',
+            'mime_type',
+            'size',
+            'category_id',
+            'year',
+            'is_active',
+            'published_at',
+        ];
+    }
+
+    private function ignoredFields(): array
+    {
+        return [
+            'updated_at',
+            'created_at',
+        ];
+    }
+
+    private function isEmptyValue(mixed $value): bool
+    {
+        return $value === null || $value === '' || (is_array($value) && count($value) === 0);
+    }
+
+    private function normalizeForCompare(mixed $value): mixed
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->map(fn ($item) => $this->normalizeForCompare($item))
+                ->values()
+                ->all();
+        }
+
+        return $value;
+    }
+
+    private function requestContext(): array
+    {
+        $request = request();
+
+        return [
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+            'path' => $request->path(),
+            'route_name' => $request->route()?->getName(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ];
     }
 }
