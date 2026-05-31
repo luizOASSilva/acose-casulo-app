@@ -16,15 +16,18 @@ class ConfirmAdminEmailChangeMail extends Mailable
 
     public ?string $logoPath = null;
     public ?string $logoUrl = null;
+    public string $confirmationUrl;
 
     public function __construct(
         public AdminEmailChangeRequest $request,
         public Admin $targetAdmin,
         public Admin $masterAdmin,
-        public string $confirmationUrl
+        string $confirmationUrl
     ) {
         $this->logoPath = Setting::emailLogoPath();
         $this->logoUrl = Setting::emailLogoUrl();
+
+        $this->confirmationUrl = $this->resolveConfirmationUrl($confirmationUrl);
     }
 
     public function build(): self
@@ -32,5 +35,38 @@ class ConfirmAdminEmailChangeMail extends Mailable
         return $this
             ->subject('Confirme a alteração de e-mail de administrador')
             ->view('emails.admin-confirm-email-change');
+    }
+
+    private function resolveConfirmationUrl(string $fallbackUrl): string
+    {
+        $token = $this->request->token ?? null;
+
+        if (! filled($token)) {
+            return $this->absoluteUrl($fallbackUrl);
+        }
+
+        return $this->frontendUrl(
+            '/admin/confirmar-alteracao-email?token=' . urlencode((string) $token)
+        );
+    }
+
+    private function frontendUrl(string $path): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
+
+        if (! $frontendUrl) {
+            $frontendUrl = rtrim((string) config('app.url'), '/');
+        }
+
+        return $frontendUrl . '/' . ltrim($path, '/');
+    }
+
+    private function absoluteUrl(string $url): string
+    {
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        return $this->frontendUrl($url);
     }
 }
