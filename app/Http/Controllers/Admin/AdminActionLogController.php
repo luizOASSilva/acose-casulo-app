@@ -14,7 +14,7 @@ class AdminActionLogController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $this->ensureMaster();
+        $this->ensureAuthenticatedAdmin();
 
         $query = AdminActionLog::query()
             ->with('admin')
@@ -70,7 +70,7 @@ class AdminActionLogController extends Controller
 
     public function filters(): JsonResponse
     {
-        $this->ensureMaster();
+        $this->ensureAuthenticatedAdmin();
 
         $admins = AdminActionLog::query()
             ->select('admin_id', 'admin_name')
@@ -132,6 +132,14 @@ class AdminActionLogController extends Controller
                 ],
             ],
         ]);
+    }
+
+    private function ensureAuthenticatedAdmin(): void
+    {
+        abort_unless(
+            auth('admin')->check(),
+            403
+        );
     }
 
     private function ensureMaster(): void

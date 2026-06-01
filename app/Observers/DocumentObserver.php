@@ -90,7 +90,7 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
         $categoryName = $this->getDocumentCategoryName($document);
         $admin = auth('admin')->user();
 
-        AdminActionLogger::log(
+        $actionLog = AdminActionLogger::log(
             action: 'document.deleted',
             title: 'Documento removido',
             description: $this->adminName() . ' removeu o documento "' . $name . '".',
@@ -112,14 +112,16 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
         $this->notifyDocumentDeleted(
             document: $document,
             name: $name,
-            categoryName: $categoryName
+            categoryName: $categoryName,
+            auditUrl: $this->auditUrl($actionLog?->id)
         );
     }
 
     private function notifyDocumentDeleted(
         Document $document,
         string $name,
-        ?string $categoryName
+        ?string $categoryName,
+        ?string $auditUrl = null
     ): void {
         try {
             $recipients = Admin::query()
@@ -145,7 +147,8 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                     categoryId: $document->category_id ?? null,
                     categoryName: $categoryName,
                     year: $document->year ?? null,
-                    deletedAt: now()
+                    deletedAt: now(),
+                    auditUrl: $auditUrl
                 )
             );
         } catch (Throwable $exception) {
@@ -156,6 +159,21 @@ class DocumentObserver implements ShouldHandleEventsAfterCommit
                 'exception' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function auditUrl(null|int|string $actionLogId): ?string
+    {
+        if (! $actionLogId) {
+            return null;
+        }
+
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
+
+        if (! $frontendUrl) {
+            $frontendUrl = rtrim((string) config('app.url'), '/');
+        }
+
+        return $frontendUrl . '/admin/auditoria/' . $actionLogId;
     }
 
     private function getDocumentName(Document $document): string

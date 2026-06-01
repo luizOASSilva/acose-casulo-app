@@ -152,6 +152,17 @@ Route::middleware('auth:admin')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Auditoria Administrativa
+    |--------------------------------------------------------------------------
+    | Admin comum pode ver a linha do tempo.
+    | Apenas Master pode abrir o detalhe, validado no controller show().
+    */
+    Route::get('/admin/action-logs', [AdminActionLogController::class, 'index']);
+    Route::get('/admin/action-logs/filters', [AdminActionLogController::class, 'filters']);
+    Route::get('/admin/action-logs/{actionLog}', [AdminActionLogController::class, 'show']);
+
+    /*
+    |--------------------------------------------------------------------------
     | Biblioteca de Mídia
     |--------------------------------------------------------------------------
     */
@@ -203,15 +214,6 @@ Route::middleware('auth:admin')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('admin.master')->group(function () {
-        /*
-        |--------------------------------------------------------------------------
-        | Auditoria Administrativa
-        |--------------------------------------------------------------------------
-        */
-        Route::get('/admin/action-logs', [AdminActionLogController::class, 'index']);
-        Route::get('/admin/action-logs/filters', [AdminActionLogController::class, 'filters']);
-        Route::get('/admin/action-logs/{actionLog}', [AdminActionLogController::class, 'show']);
-
         /*
         |--------------------------------------------------------------------------
         | Gestão de Administradores

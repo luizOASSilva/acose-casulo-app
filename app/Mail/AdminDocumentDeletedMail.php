@@ -26,6 +26,7 @@ class AdminDocumentDeletedMail extends Mailable
         public readonly ?string $categoryName,
         public readonly int|string|null $year,
         public readonly CarbonInterface $deletedAt,
+        public readonly ?string $auditUrl = null,
     ) {
         $this->prepareLogo();
     }
@@ -44,6 +45,7 @@ class AdminDocumentDeletedMail extends Mailable
                 'categoryName' => $this->categoryName,
                 'year' => $this->year,
                 'deletedAt' => $this->deletedAt,
+                'auditUrl' => $this->auditUrl,
                 'logoPath' => $this->logoPath,
                 'logoUrl' => $this->logoUrl,
             ]);
