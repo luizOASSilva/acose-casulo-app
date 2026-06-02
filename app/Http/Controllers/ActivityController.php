@@ -172,18 +172,7 @@ class ActivityController extends Controller
 
     public function show(string $activity)
     {
-        $activityModel = Activity::query()
-            ->where('id', $activity)
-            ->orWhereHas('publication', function ($query) use ($activity) {
-                $query->where('slug', $activity);
-            })
-            ->with([
-                'publication.media',
-                'publication.admin',
-                'schedules',
-            ])
-            ->withCount('likes')
-            ->firstOrFail();
+        $activityModel = $this->findActivityByIdOrSlug($activity);
 
         return ActivityResource::make($activityModel);
     }
@@ -192,18 +181,7 @@ class ActivityController extends Controller
     {
         $validated = $request->validated();
 
-        $activityModel = Activity::query()
-            ->where('id', $activity)
-            ->orWhereHas('publication', function ($query) use ($activity) {
-                $query->where('slug', $activity);
-            })
-            ->with([
-                'publication.media',
-                'publication.admin',
-                'schedules',
-            ])
-            ->withCount('likes')
-            ->firstOrFail();
+        $activityModel = $this->findActivityByIdOrSlug($activity);
 
         $before = ActivityAuditLogger::snapshot($activityModel);
 
@@ -261,23 +239,25 @@ class ActivityController extends Controller
         return ActivityResource::make($activityModel);
     }
 
-    public function destroy(Activity $activity)
+    public function destroy(string $activity)
     {
-        $activity->load([
+        $activityModel = $this->findActivityByIdOrSlug($activity);
+
+        $activityModel->load([
             'publication.media',
             'publication.admin',
             'schedules',
         ]);
 
-        $snapshot = ActivityAuditLogger::snapshot($activity);
+        $snapshot = ActivityAuditLogger::snapshot($activityModel);
 
-        DB::transaction(function () use ($activity, $snapshot) {
-            ActivityAuditLogger::deleted($activity, $snapshot, request());
+        DB::transaction(function () use ($activityModel, $snapshot) {
+            ActivityAuditLogger::deleted($activityModel, $snapshot, request());
 
-            $publication = $activity->publication;
+            $publication = $activityModel->publication;
             $media = $publication?->media;
 
-            $activity->delete();
+            $activityModel->delete();
             $publication?->delete();
             $media?->delete();
         });
@@ -340,5 +320,21 @@ class ActivityController extends Controller
             'likes_count' => $likesCount,
             'visitor_id' => $visitorId,
         ]);
+    }
+
+    private function findActivityByIdOrSlug(string $activity): Activity
+    {
+        return Activity::query()
+            ->where('id', $activity)
+            ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
+            ->with([
+                'publication.media',
+                'publication.admin',
+                'schedules',
+            ])
+            ->withCount('likes')
+            ->firstOrFail();
     }
 }
