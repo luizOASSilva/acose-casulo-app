@@ -19,6 +19,10 @@ npm-debug.log
 yarn-error.log
 /auth.json
 
+# Credenciais privadas
+/storage/app/private/*.json
+/storage/app/private/analytics/*.json
+
 # IDEs e Editores
 /.fleet
 /.idea

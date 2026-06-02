@@ -12,9 +12,11 @@ use App\Models\Document;
 use App\Models\Donation;
 use App\Models\MediaFile;
 use App\Models\Partner;
+use App\Services\GoogleAnalyticsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class DashboardController extends Controller
 {
@@ -56,7 +58,9 @@ class DashboardController extends Controller
 
             'status' => [
                 'api' => 'Online',
-                'analytics' => 'Indisponível',
+                'analytics' => ($analyticsData['available'] ?? false)
+                    ? 'Online'
+                    : 'Indisponível',
             ],
 
             'recent_activity' => $this->getRecentAdminActions($request),
@@ -80,12 +84,19 @@ class DashboardController extends Controller
 
     private function getAnalyticsData(): array
     {
-        return $this->defaultAnalyticsData();
+        try {
+            return app(GoogleAnalyticsService::class)->dashboardSummary();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->defaultAnalyticsData();
+        }
     }
 
     private function defaultAnalyticsData(): array
     {
         return [
+            'available' => false,
             'visitors' => 0,
             'growth' => '0',
             'pageviews' => 0,

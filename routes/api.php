@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AdminEmailChangeController;
 use App\Http\Controllers\Admin\AdminPasswordResetController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\AdminActionLogController;
+use App\Http\Controllers\Admin\AdminAnalyticsController;
 
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\ActivityController;
@@ -141,6 +142,13 @@ Route::middleware('auth:admin')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/admin/analytics/summary', [AdminAnalyticsController::class, 'summary']);
 
     /*
     |--------------------------------------------------------------------------
