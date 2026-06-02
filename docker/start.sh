@@ -39,6 +39,7 @@ else
     ls -la /var/www/html/storage || true
     ls -la /var/www/html/storage/app || true
     ls -la /var/www/html/storage/app/public || true
+    exit 1
 fi
 
 echo "Limpando caches Laravel sem depender da tabela cache..."
@@ -52,9 +53,7 @@ if [ "${RUN_FRESH_MIGRATIONS:-false}" = "true" ]; then
     echo "ATENÇÃO: RUN_FRESH_MIGRATIONS=true detectado."
     echo "Rodando migrate:fresh --seed --force. Isso apaga e recria todas as tabelas."
 
-    php artisan migrate:fresh --seed --force -v || {
-        echo "migrate:fresh --seed falhou, mas o container continuará subindo para evitar loop."
-    }
+    php artisan migrate:fresh --seed --force -v
 else
     echo "Rodando migrations..."
     php artisan migrate --force
@@ -65,14 +64,10 @@ else
 
         if [ -n "$SEEDER_CLASS" ]; then
             echo "Rodando seeder específico: $SEEDER_CLASS"
-            php artisan db:seed --class="$SEEDER_CLASS" --force -v || {
-                echo "Seeder $SEEDER_CLASS falhou, mas o container continuará subindo para evitar loop."
-            }
+            php artisan db:seed --class="$SEEDER_CLASS" --force -v
         else
             echo "Rodando DatabaseSeeder..."
-            php artisan db:seed --force -v || {
-                echo "DatabaseSeeder falhou, mas o container continuará subindo para evitar loop."
-            }
+            php artisan db:seed --force -v
         fi
 
         echo "Etapa de seeders finalizada."
@@ -101,6 +96,7 @@ if su -s /bin/sh www-data -c "touch /var/www/html/storage/app/public/.write-test
 else
     echo "ERRO FINAL: www-data ainda não consegue escrever em storage/app/public."
     ls -la /var/www/html/storage/app/public || true
+    exit 1
 fi
 
 echo "Cacheando config..."
