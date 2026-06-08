@@ -82,7 +82,7 @@ class Setting extends Model
     {
         $logo = self::emailLogoValue();
 
-        if (!$logo) {
+        if (! $logo) {
             return null;
         }
 
@@ -91,7 +91,7 @@ class Setting extends Model
         if (Str::startsWith($logo, ['http://', 'https://'])) {
             $path = parse_url($logo, PHP_URL_PATH);
 
-            if (!$path) {
+            if (! $path) {
                 return null;
             }
 
@@ -115,7 +115,7 @@ class Setting extends Model
     {
         $logo = self::emailLogoValue();
 
-        if (!$logo) {
+        if (! $logo) {
             return null;
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Article;
 
+use App\Support\RichTextSanitizer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -10,6 +11,15 @@ class StoreArticleRequest extends FormRequest
     public function authorize(): bool
     {
         return (bool) $this->user('admin');
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('content') && is_string($this->input('content'))) {
+            $this->merge([
+                'content' => RichTextSanitizer::clean($this->input('content')),
+            ]);
+        }
     }
 
     /**

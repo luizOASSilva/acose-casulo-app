@@ -4,6 +4,7 @@ namespace App\Http\Requests\Activity;
 
 use App\Models\Activity;
 use App\Models\ActivitySchedule;
+use App\Support\RichTextSanitizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -12,6 +13,15 @@ class UpdateActivityRequest extends FormRequest
     public function authorize(): bool
     {
         return (bool) $this->user('admin');
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('content') && is_string($this->input('content'))) {
+            $this->merge([
+                'content' => RichTextSanitizer::clean($this->input('content')),
+            ]);
+        }
     }
 
     public function rules(): array

@@ -114,6 +114,16 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'group' => 'social',
+                'key' => 'youtube_url',
+                'label' => 'YouTube',
+                'description' => 'URL do canal ou perfil no YouTube.',
+                'type' => 'url',
+                'value' => '',
+                'is_public' => true,
+                'sort_order' => 22,
+            ],
+            [
+                'group' => 'social',
                 'key' => 'instagram_url',
                 'label' => 'Instagram',
                 'description' => 'URL do perfil no Instagram.',
