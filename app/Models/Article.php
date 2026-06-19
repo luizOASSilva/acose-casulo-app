@@ -18,15 +18,25 @@ class Article extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        $query = $this->with('publication.media', 'publication.admin', 'keywords');
+        $query = $this->with([
+            'publication.media.translations',
+            'publication.admin',
+            'publication.translations',
+            'keywords.translations',
+        ]);
 
         if (is_numeric($value)) {
             return $query->findOrFail($value);
         }
 
-        return $query->whereHas('publication', function ($q) use ($value) {
-            $q->where('slug', $value);
-        })->firstOrFail();
+        return $query
+            ->whereHas('publication', function ($publicationQuery) use ($value) {
+                $publicationQuery->where('slug', $value);
+            })
+            ->orWhereHas('publication.translations', function ($translationQuery) use ($value) {
+                $translationQuery->where('slug', $value);
+            })
+            ->firstOrFail();
     }
 
     public function publication(): BelongsTo

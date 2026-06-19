@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,12 @@ class SettingResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $locale = Setting::normalizeLocale(
+            $request->query('locale') ?? $request->header('X-Locale')
+        );
+
+        $translation = $this->translationFor($locale);
+
         return [
             'id' => $this->id,
             'group' => $this->group,
@@ -19,8 +26,17 @@ class SettingResource extends JsonResource
             'value' => $this->value,
             'is_public' => $this->is_public,
             'sort_order' => $this->sort_order,
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+
+            'is_translatable' => $this->isTranslatablePublicValue(),
+            'translated_value' => $this->translatedValue($locale),
+            'translation' => $translation
+                ? [
+                    'locale' => $translation->locale,
+                    'value' => $translation->value,
+                    'translation_status' => $translation->translation_status,
+                    'translated_at' => $translation->translated_at?->toIso8601String(),
+                ]
+                : null,
         ];
     }
 }

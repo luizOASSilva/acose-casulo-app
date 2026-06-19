@@ -7,8 +7,11 @@ use App\Http\Requests\Article\UpdateArticleRequest;
 use App\Http\Resources\ArticleResource;
 use App\Models\Article;
 use App\Models\Keyword;
+use App\Models\KeywordTranslation;
 use App\Models\Media;
+use App\Models\MediaTranslation;
 use App\Models\Publication;
+use App\Models\PublicationTranslation;
 use App\Services\ArticleAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,9 +22,10 @@ class ArticleController extends Controller
     {
         $query = Article::query()
             ->with([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
-                'keywords',
+                'publication.translations',
+                'keywords.translations',
             ]);
 
         if ($request->filled('q')) {
@@ -34,6 +38,18 @@ class ArticleController extends Controller
                         $publicationQuery
                             ->where('title', 'like', "%{$search}%")
                             ->orWhere('content', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('publication.translations', function ($translationQuery) use ($search) {
+                        $translationQuery
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%")
+                            ->orWhere('summary', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('keywords', function ($keywordQuery) use ($search) {
+                        $keywordQuery->where('word', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('keywords.translations', function ($keywordTranslationQuery) use ($search) {
+                        $keywordTranslationQuery->where('word', 'like', "%{$search}%");
                     });
             });
         }
@@ -44,8 +60,14 @@ class ArticleController extends Controller
             );
 
             foreach ($keywordTerms as $keyword) {
-                $query->whereHas('keywords', function ($keywordQuery) use ($keyword) {
-                    $keywordQuery->where('word', 'like', "%{$keyword}%");
+                $query->where(function ($articleQuery) use ($keyword) {
+                    $articleQuery
+                        ->whereHas('keywords', function ($keywordQuery) use ($keyword) {
+                            $keywordQuery->where('word', 'like', "%{$keyword}%");
+                        })
+                        ->orWhereHas('keywords.translations', function ($translationQuery) use ($keyword) {
+                            $translationQuery->where('word', 'like', "%{$keyword}%");
+                        });
                 });
             }
         }
@@ -73,9 +95,10 @@ class ArticleController extends Controller
     {
         return ArticleResource::collection(
             Article::with([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
-                'keywords',
+                'publication.translations',
+                'keywords.translations',
             ])
                 ->latest()
                 ->limit(4)
@@ -94,6 +117,8 @@ class ArticleController extends Controller
                 'caption' => $validated['image_caption'] ?? null,
             ]);
 
+            $this->syncMediaPortugueseTranslation($media);
+
             $admin = $request->user('admin') ?? $request->user();
 
             $publication = Publication::create([
@@ -108,12 +133,23 @@ class ArticleController extends Controller
                 'publication_id' => $publication->id,
             ]);
 
+            $this->syncPortugueseTranslation(
+                publication: $publication->fresh(),
+                summary: $validated['summary']
+            );
+
             if (array_key_exists('keywords', $validated)) {
                 $keywordIds = collect($validated['keywords'])
                     ->filter()
-                    ->map(fn ($word) => Keyword::firstOrCreate([
-                        'word' => $word,
-                    ])->id)
+                    ->map(function ($word) {
+                        $keyword = Keyword::firstOrCreate([
+                            'word' => trim((string) $word),
+                        ]);
+
+                        $this->syncKeywordPortugueseTranslation($keyword);
+
+                        return $keyword->id;
+                    })
                     ->values()
                     ->all();
 
@@ -121,9 +157,10 @@ class ArticleController extends Controller
             }
 
             return $article->fresh([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
-                'keywords',
+                'publication.translations',
+                'keywords.translations',
             ]);
         });
 
@@ -131,26 +168,17 @@ class ArticleController extends Controller
 
         return ArticleResource::make(
             $article->load([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
-                'keywords',
+                'publication.translations',
+                'keywords.translations',
             ])
         )->response()->setStatusCode(201);
     }
 
     public function show(string $article)
     {
-        $articleModel = Article::query()
-            ->where('id', $article)
-            ->orWhereHas('publication', function ($query) use ($article) {
-                $query->where('slug', $article);
-            })
-            ->with([
-                'publication.media',
-                'publication.admin',
-                'keywords',
-            ])
-            ->firstOrFail();
+        $articleModel = $this->findArticleByIdOrSlug($article);
 
         return ArticleResource::make($articleModel);
     }
@@ -159,24 +187,15 @@ class ArticleController extends Controller
     {
         $validated = $request->validated();
 
-        $articleModel = Article::query()
-            ->where('id', $article)
-            ->orWhereHas('publication', function ($query) use ($article) {
-                $query->where('slug', $article);
-            })
-            ->with([
-                'publication.media',
-                'publication.admin',
-                'keywords',
-            ])
-            ->firstOrFail();
+        $articleModel = $this->findArticleByIdOrSlug($article);
 
         $before = ArticleAuditLogger::snapshot($articleModel);
 
         $articleModel = DB::transaction(function () use ($validated, $articleModel) {
             $articleModel->load([
-                'publication.media',
-                'keywords',
+                'publication.media.translations',
+                'publication.translations',
+                'keywords.translations',
             ]);
 
             if (
@@ -191,6 +210,12 @@ class ArticleController extends Controller
                         ? $validated['image_caption']
                         : $articleModel->publication->media->caption,
                 ]);
+
+                $articleModel->publication->media->refresh();
+
+                $this->syncMediaPortugueseTranslation(
+                    $articleModel->publication->media
+                );
             }
 
             if (
@@ -209,12 +234,26 @@ class ArticleController extends Controller
                 ]);
             }
 
+            $articleModel->refresh();
+            $articleModel->load('publication');
+
+            $this->syncPortugueseTranslation(
+                publication: $articleModel->publication,
+                summary: $articleModel->summary
+            );
+
             if (array_key_exists('keywords', $validated)) {
                 $keywordIds = collect($validated['keywords'])
                     ->filter()
-                    ->map(fn ($word) => Keyword::firstOrCreate([
-                        'word' => $word,
-                    ])->id)
+                    ->map(function ($word) {
+                        $keyword = Keyword::firstOrCreate([
+                            'word' => trim((string) $word),
+                        ]);
+
+                        $this->syncKeywordPortugueseTranslation($keyword);
+
+                        return $keyword->id;
+                    })
                     ->values()
                     ->all();
 
@@ -222,9 +261,10 @@ class ArticleController extends Controller
             }
 
             return $articleModel->fresh([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
-                'keywords',
+                'publication.translations',
+                'keywords.translations',
             ]);
         });
 
@@ -243,9 +283,10 @@ class ArticleController extends Controller
     public function destroy(Article $article)
     {
         $article->load([
-            'publication.media',
+            'publication.media.translations',
             'publication.admin',
-            'keywords',
+            'publication.translations',
+            'keywords.translations',
         ]);
 
         $snapshot = ArticleAuditLogger::snapshot($article);
@@ -264,6 +305,76 @@ class ArticleController extends Controller
         });
 
         return response()->json(null, 204);
+    }
+
+    private function findArticleByIdOrSlug(string $article): Article
+    {
+        return Article::query()
+            ->where('id', $article)
+            ->orWhereHas('publication', function ($query) use ($article) {
+                $query->where('slug', $article);
+            })
+            ->orWhereHas('publication.translations', function ($query) use ($article) {
+                $query->where('slug', $article);
+            })
+            ->with([
+                'publication.media.translations',
+                'publication.admin',
+                'publication.translations',
+                'keywords.translations',
+            ])
+            ->firstOrFail();
+    }
+
+    private function syncPortugueseTranslation(
+        Publication $publication,
+        ?string $summary = null
+    ): void {
+        PublicationTranslation::updateOrCreate(
+            [
+                'publication_id' => $publication->id,
+                'locale' => PublicationTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'title' => $publication->title,
+                'slug' => $publication->slug,
+                'content' => $publication->content,
+                'summary' => $summary,
+                'translation_status' => PublicationTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
+    }
+
+    private function syncMediaPortugueseTranslation(Media $media): void
+    {
+        MediaTranslation::updateOrCreate(
+            [
+                'media_id' => $media->id,
+                'locale' => MediaTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'alt_text' => $media->alt_text,
+                'caption' => $media->caption,
+                'translation_status' => MediaTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
+    }
+
+    private function syncKeywordPortugueseTranslation(Keyword $keyword): void
+    {
+        KeywordTranslation::updateOrCreate(
+            [
+                'keyword_id' => $keyword->id,
+                'locale' => KeywordTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'word' => $keyword->word,
+                'translation_status' => KeywordTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
     }
 
     private function parseKeywordTerms(string $value): array

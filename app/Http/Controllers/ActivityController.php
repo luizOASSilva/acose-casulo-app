@@ -9,7 +9,9 @@ use App\Models\Activity;
 use App\Models\ActivityLike;
 use App\Models\ActivitySchedule;
 use App\Models\Media;
+use App\Models\MediaTranslation;
 use App\Models\Publication;
+use App\Models\PublicationTranslation;
 use App\Services\ActivityAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,8 +24,9 @@ class ActivityController extends Controller
     {
         $query = Activity::query()
             ->with([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
+                'publication.translations',
                 'schedules',
             ])
             ->withCount('likes');
@@ -31,10 +34,18 @@ class ActivityController extends Controller
         if ($request->filled('q')) {
             $search = trim((string) $request->input('q'));
 
-            $query->whereHas('publication', function ($publicationQuery) use ($search) {
-                $publicationQuery
-                    ->where('title', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
+            $query->where(function ($activityQuery) use ($search) {
+                $activityQuery
+                    ->whereHas('publication', function ($publicationQuery) use ($search) {
+                        $publicationQuery
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('publication.translations', function ($translationQuery) use ($search) {
+                        $translationQuery
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -98,8 +109,9 @@ class ActivityController extends Controller
         return ActivityResource::collection(
             Activity::query()
                 ->with([
-                    'publication.media',
+                    'publication.media.translations',
                     'publication.admin',
+                    'publication.translations',
                     'schedules',
                 ])
                 ->withCount('likes')
@@ -109,18 +121,21 @@ class ActivityController extends Controller
         );
     }
 
-    public function schedules()
+    public function schedules(Request $request)
     {
+        $locale = $this->resolveLocale($request);
+
         return ActivitySchedule::query()
-            ->with('activity.publication')
+            ->with('activity.publication.translations')
             ->orderByRaw("FIELD(weekday, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')")
             ->orderBy('start_time')
             ->get()
             ->map(fn ($schedule) => [
                 'id' => $schedule->id,
                 'activity_id' => $schedule->activity_id,
-                'activity_title' => $schedule->activity?->publication?->title,
+                'activity_title' => $schedule->activity?->publication?->translatedTitle($locale),
                 'weekday' => $schedule->weekday,
+                'weekday_label' => $this->weekdayLabel($schedule->weekday, $locale),
                 'start_time' => substr($schedule->start_time, 0, 5),
                 'end_time' => substr($schedule->end_time, 0, 5),
             ]);
@@ -137,6 +152,8 @@ class ActivityController extends Controller
                 'caption' => $validated['image_caption'] ?? null,
             ]);
 
+            $this->syncMediaPortugueseTranslation($media);
+
             $admin = $request->user('admin') ?? $request->user();
 
             $publication = Publication::create([
@@ -146,6 +163,8 @@ class ActivityController extends Controller
                 'media_id' => $media->id,
             ]);
 
+            $this->syncPortugueseTranslation($publication->fresh());
+
             $activity = Activity::create([
                 'publication_id' => $publication->id,
             ]);
@@ -153,8 +172,9 @@ class ActivityController extends Controller
             $activity->schedules()->createMany($validated['schedules']);
 
             return $activity->fresh([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
+                'publication.translations',
                 'schedules',
             ])->loadCount('likes');
         });
@@ -163,8 +183,9 @@ class ActivityController extends Controller
 
         return ActivityResource::make(
             $activity->load([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
+                'publication.translations',
                 'schedules',
             ])->loadCount('likes')
         )->response()->setStatusCode(201);
@@ -187,7 +208,8 @@ class ActivityController extends Controller
 
         $activityModel = DB::transaction(function () use ($validated, $activityModel) {
             $activityModel->load([
-                'publication.media',
+                'publication.media.translations',
+                'publication.translations',
                 'schedules',
             ]);
 
@@ -203,6 +225,12 @@ class ActivityController extends Controller
                         ? $validated['image_caption']
                         : $activityModel->publication->media->caption,
                 ]);
+
+                $activityModel->publication->media->refresh();
+
+                $this->syncMediaPortugueseTranslation(
+                    $activityModel->publication->media
+                );
             }
 
             if (
@@ -215,14 +243,19 @@ class ActivityController extends Controller
                 ]);
             }
 
+            $activityModel->publication->refresh();
+
+            $this->syncPortugueseTranslation($activityModel->publication);
+
             if (array_key_exists('schedules', $validated)) {
                 $activityModel->schedules()->delete();
                 $activityModel->schedules()->createMany($validated['schedules']);
             }
 
             return $activityModel->fresh([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
+                'publication.translations',
                 'schedules',
             ])->loadCount('likes');
         });
@@ -244,8 +277,9 @@ class ActivityController extends Controller
         $activityModel = $this->findActivityByIdOrSlug($activity);
 
         $activityModel->load([
-            'publication.media',
+            'publication.media.translations',
             'publication.admin',
+            'publication.translations',
             'schedules',
         ]);
 
@@ -270,6 +304,9 @@ class ActivityController extends Controller
         $activityModel = Activity::query()
             ->where('id', $activity)
             ->orWhereHas('publication', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
+            ->orWhereHas('publication.translations', function ($query) use ($activity) {
                 $query->where('slug', $activity);
             })
             ->firstOrFail();
@@ -329,12 +366,91 @@ class ActivityController extends Controller
             ->orWhereHas('publication', function ($query) use ($activity) {
                 $query->where('slug', $activity);
             })
+            ->orWhereHas('publication.translations', function ($query) use ($activity) {
+                $query->where('slug', $activity);
+            })
             ->with([
-                'publication.media',
+                'publication.media.translations',
                 'publication.admin',
+                'publication.translations',
                 'schedules',
             ])
             ->withCount('likes')
             ->firstOrFail();
+    }
+
+    private function syncPortugueseTranslation(Publication $publication): void
+    {
+        PublicationTranslation::updateOrCreate(
+            [
+                'publication_id' => $publication->id,
+                'locale' => PublicationTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'title' => $publication->title,
+                'slug' => $publication->slug,
+                'content' => $publication->content,
+                'summary' => null,
+                'translation_status' => PublicationTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
+    }
+
+    private function syncMediaPortugueseTranslation(Media $media): void
+    {
+        MediaTranslation::updateOrCreate(
+            [
+                'media_id' => $media->id,
+                'locale' => MediaTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'alt_text' => $media->alt_text,
+                'caption' => $media->caption,
+                'translation_status' => MediaTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
+    }
+
+    private function resolveLocale(Request $request): string
+    {
+        $locale = (string) (
+            $request->query('locale')
+            ?? $request->header('X-Locale')
+            ?? PublicationTranslation::LOCALE_PT_BR
+        );
+
+        return match ($locale) {
+            'en', 'en-US', 'en_US' => PublicationTranslation::LOCALE_EN,
+            default => PublicationTranslation::LOCALE_PT_BR,
+        };
+    }
+
+    private function weekdayLabel(?string $weekday, string $locale): string
+    {
+        $labels = [
+            PublicationTranslation::LOCALE_PT_BR => [
+                'monday' => 'Segunda-feira',
+                'tuesday' => 'Terça-feira',
+                'wednesday' => 'Quarta-feira',
+                'thursday' => 'Quinta-feira',
+                'friday' => 'Sexta-feira',
+                'saturday' => 'Sábado',
+                'sunday' => 'Domingo',
+            ],
+
+            PublicationTranslation::LOCALE_EN => [
+                'monday' => 'Monday',
+                'tuesday' => 'Tuesday',
+                'wednesday' => 'Wednesday',
+                'thursday' => 'Thursday',
+                'friday' => 'Friday',
+                'saturday' => 'Saturday',
+                'sunday' => 'Sunday',
+            ],
+        ];
+
+        return $labels[$locale][$weekday] ?? $weekday ?? '';
     }
 }

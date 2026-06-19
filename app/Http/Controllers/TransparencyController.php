@@ -2,44 +2,67 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\DocumentCategoryResource;
 use App\Models\Document;
 use App\Models\DocumentCategory;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class TransparencyController extends Controller
 {
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $year = request('year');
+        $year = $request->input('year');
 
         if (! $year) {
-            $year = Document::max('year') ?? now()->year;
+            $year = Document::query()->max('year') ?? now()->year;
         }
 
-        $years = Document::select('year')
-            ->distinct()
-            ->orderBy('year')
-            ->pluck('year');
+        $year = (int) $year;
 
-        $categories = DocumentCategory::with([
-            'documents' => fn ($q) => $q->where('year', $year)->orderBy('title'),
-        ])
+        $years = Document::query()
+            ->select('year')
+            ->whereNotNull('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(fn ($item) => (int) $item)
+            ->values();
+
+        $categories = DocumentCategory::query()
+            ->with([
+                'translations',
+                'documents' => fn ($query) => $query
+                    ->where('year', $year)
+                    ->with([
+                        'translations',
+                        'category.translations',
+                    ])
+                    ->orderBy('title'),
+            ])
             ->orderBy('order')
             ->get()
-            ->map(function ($category) {
-                $category->documents = $category->documents->values();
+            ->map(function (DocumentCategory $category) {
+                $category->setRelation(
+                    'documents',
+                    $category->documents->values()
+                );
 
                 return $category;
             })
-            ->filter(fn ($c) => $c->documents->isNotEmpty())
+            ->filter(fn (DocumentCategory $category) => $category->documents->isNotEmpty())
             ->values();
 
         $featured = $categories->firstWhere('featured', true);
 
         return response()->json([
-            'year' => (int) $year,
+            'year' => $year,
             'years' => $years,
-            'categories' => $categories,
-            'featured' => $featured,
+            'categories' => DocumentCategoryResource::collection($categories)
+                ->resolve($request),
+            'featured' => $featured
+                ? DocumentCategoryResource::make($featured)->resolve($request)
+                : null,
         ]);
     }
 }

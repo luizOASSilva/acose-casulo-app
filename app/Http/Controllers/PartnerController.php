@@ -6,162 +6,143 @@ use App\Http\Requests\Partner\StorePartnerRequest;
 use App\Http\Requests\Partner\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
 use App\Models\Partner;
-use Illuminate\Http\JsonResponse;
+use App\Models\PartnerTranslation;
+use App\Support\TranslationDispatcher;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Str;
 
 class PartnerController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request)
     {
-        $isAdmin = (bool) $request->user('admin');
-
         $query = Partner::query()
-            ->with('admin')
-            ->when(! $isAdmin, function ($query) {
-                $query->where('is_active', true);
-            });
+            ->with([
+                'admin',
+                'translations',
+            ])
+            ->orderBy('order')
+            ->orderBy('name');
 
         if ($request->filled('q')) {
             $search = trim((string) $request->input('q'));
 
-            $query->where(function ($query) use ($search) {
-                $query
+            $query->where(function ($partnerQuery) use ($search) {
+                $partnerQuery
                     ->where('name', 'like', "%{$search}%")
-                    ->orWhere('website_url', 'like', "%{$search}%");
+                    ->orWhere('logo_alt', 'like', "%{$search}%")
+                    ->orWhereHas('translations', function ($translationQuery) use ($search) {
+                        $translationQuery->where('logo_alt', 'like', "%{$search}%");
+                    });
             });
         }
 
-        if ($isAdmin && $request->filled('status')) {
-            $status = (string) $request->input('status');
-
-            if ($status === 'active') {
-                $query->where('is_active', true);
-            }
-
-            if ($status === 'inactive') {
-                $query->where('is_active', false);
-            }
+        if ($request->filled('status')) {
+            match ($request->input('status')) {
+                'active' => $query->where('is_active', true),
+                'inactive' => $query->where('is_active', false),
+                default => null,
+            };
         }
 
-        $query
-            ->orderBy('order')
-            ->orderBy('name');
-
-        if ($request->filled('per_page') || $request->filled('page')) {
-            $perPage = (int) $request->input('per_page', 18);
-            $perPage = max(1, min($perPage, 48));
-
-            return PartnerResource::collection(
-                $query->paginate($perPage)->withQueryString()
-            );
+        if ($request->boolean('all')) {
+            return PartnerResource::collection($query->get());
         }
+
+        $perPage = (int) $request->input('per_page', 12);
+        $perPage = max(1, min($perPage, 48));
 
         return PartnerResource::collection(
-            $query->get()
+            $query->paginate($perPage)->withQueryString()
         );
     }
 
-    public function show(Request $request, Partner $partner): PartnerResource
+    public function publicIndex()
     {
-        abort_if(
-            ! $request->user('admin') && ! $partner->is_active,
-            404,
-            'Parceiro não encontrado.'
-        );
-
-        return new PartnerResource(
-            $partner->load('admin')
+        return PartnerResource::collection(
+            Partner::query()
+                ->with('translations')
+                ->where('is_active', true)
+                ->orderBy('order')
+                ->orderBy('name')
+                ->get()
         );
     }
 
-    public function store(StorePartnerRequest $request): PartnerResource
+    public function store(StorePartnerRequest $request)
     {
         $validated = $request->validated();
 
-        $partner = Partner::query()->create([
-            'admin_id' => $request->user('admin')?->id,
-            'name' => $validated['name'],
-            'logo_path' => $this->normalizeLogoPath($validated['logo_path']),
-            'logo_alt' => $validated['logo_alt'] ?? null,
-            'website_url' => $validated['website_url'] ?? null,
-            'bg_color' => $validated['bg_color'] ?? '#ffffff',
-            'order' => $validated['order'] ?? 0,
-            'is_active' => $validated['is_active'] ?? true,
+        $adminId = $request->user('admin')?->id ?? $request->user()?->id;
+
+        abort_unless($adminId, 403, 'Administrador não autenticado.');
+
+        $partner = Partner::create([
+            ...$validated,
+            'admin_id' => $adminId,
         ]);
 
-        return new PartnerResource(
-            $partner->fresh('admin')
+        $this->syncPortugueseTranslation($partner);
+
+        TranslationDispatcher::partner($partner);
+
+        return PartnerResource::make(
+            $partner->fresh([
+                'admin',
+                'translations',
+            ])
+        )->response()->setStatusCode(201);
+    }
+
+    public function show(Partner $partner)
+    {
+        return PartnerResource::make(
+            $partner->load([
+                'admin',
+                'translations',
+            ])
         );
     }
 
-    public function update(
-        UpdatePartnerRequest $request,
-        Partner $partner
-    ): PartnerResource {
+    public function update(UpdatePartnerRequest $request, Partner $partner)
+    {
         $validated = $request->validated();
 
-        $data = [];
+        unset($validated['admin_id']);
 
-        if (array_key_exists('name', $validated)) {
-            $data['name'] = $validated['name'];
-        }
+        $partner->update($validated);
 
-        if (array_key_exists('logo_path', $validated)) {
-            $data['logo_path'] = $this->normalizeLogoPath($validated['logo_path']);
-        }
+        $partner->refresh();
 
-        if (array_key_exists('logo_alt', $validated)) {
-            $data['logo_alt'] = $validated['logo_alt'];
-        }
+        $this->syncPortugueseTranslation($partner);
 
-        if (array_key_exists('website_url', $validated)) {
-            $data['website_url'] = $validated['website_url'];
-        }
+        TranslationDispatcher::partner($partner);
 
-        if (array_key_exists('bg_color', $validated)) {
-            $data['bg_color'] = $validated['bg_color'] ?? '#ffffff';
-        }
-
-        if (array_key_exists('order', $validated)) {
-            $data['order'] = $validated['order'] ?? 0;
-        }
-
-        if (array_key_exists('is_active', $validated)) {
-            $data['is_active'] = $validated['is_active'];
-        }
-
-        $partner->update($data);
-
-        return new PartnerResource(
-            $partner->fresh('admin')
+        return PartnerResource::make(
+            $partner->load([
+                'admin',
+                'translations',
+            ])
         );
     }
 
-    public function destroy(Partner $partner): JsonResponse
+    public function destroy(Partner $partner)
     {
         $partner->delete();
 
-        return response()->json([
-            'message' => 'Parceiro removido com sucesso.',
-        ]);
+        return response()->json(null, 204);
     }
 
-    private function normalizeLogoPath(string $logoPath): string
+    private function syncPortugueseTranslation(Partner $partner): void
     {
-        if (Str::startsWith($logoPath, asset('storage/'))) {
-            return Str::after($logoPath, asset('storage/'));
-        }
-
-        if (Str::startsWith($logoPath, '/storage/')) {
-            return Str::after($logoPath, '/storage/');
-        }
-
-        if (Str::startsWith($logoPath, 'storage/')) {
-            return Str::after($logoPath, 'storage/');
-        }
-
-        return $logoPath;
+        PartnerTranslation::updateOrCreate(
+            [
+                'partner_id' => $partner->id,
+                'locale' => PartnerTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'logo_alt' => $partner->logo_alt,
+                'translation_status' => PartnerTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
     }
 }

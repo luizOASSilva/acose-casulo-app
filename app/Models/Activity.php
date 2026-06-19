@@ -17,14 +17,24 @@ class Activity extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        return $this->whereHas('publication', function ($query) use ($value) {
-            $query->where('slug', $value);
-        })
-            ->with([
-                'publication.media',
-                'publication.admin',
-                'schedules',
-            ])
+        $query = $this->with([
+            'publication.media.translations',
+            'publication.admin',
+            'publication.translations',
+            'schedules',
+        ]);
+
+        if (is_numeric($value)) {
+            return $query->findOrFail($value);
+        }
+
+        return $query
+            ->whereHas('publication', function ($publicationQuery) use ($value) {
+                $publicationQuery->where('slug', $value);
+            })
+            ->orWhereHas('publication.translations', function ($translationQuery) use ($value) {
+                $translationQuery->where('slug', $value);
+            })
             ->firstOrFail();
     }
 
@@ -43,4 +53,3 @@ class Activity extends Model
         return $this->hasMany(ActivityLike::class);
     }
 }
-

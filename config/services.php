@@ -14,6 +14,12 @@ return [
     |
     */
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'translation_model' => env('OPENAI_TRANSLATION_MODEL', 'gpt-5.5'),
+        'auto_translate_public_content' => env('AUTO_TRANSLATE_PUBLIC_CONTENT', false),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

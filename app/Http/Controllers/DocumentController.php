@@ -6,6 +6,8 @@ use App\Http\Requests\Document\StoreDocumentRequest;
 use App\Http\Requests\Document\UpdateDocumentRequest;
 use App\Http\Resources\DocumentResource;
 use App\Models\Document;
+use App\Models\DocumentTranslation;
+use App\Support\TranslationDispatcher;
 
 class DocumentController extends Controller
 {
@@ -13,7 +15,8 @@ class DocumentController extends Controller
     {
         $documents = Document::query()
             ->with([
-                'category',
+                'translations',
+                'category.translations',
                 'admin',
             ])
             ->when(request('year'), fn ($query, $year) => $query->where('year', $year))
@@ -37,9 +40,14 @@ class DocumentController extends Controller
             'admin_id' => $adminId,
         ]);
 
+        $this->syncPortugueseTranslation($document);
+
+        TranslationDispatcher::document($document);
+
         return DocumentResource::make(
-            $document->load([
-                'category',
+            $document->fresh()->load([
+                'translations',
+                'category.translations',
                 'admin',
             ])
         )->response()->setStatusCode(201);
@@ -49,7 +57,8 @@ class DocumentController extends Controller
     {
         return DocumentResource::make(
             $document->load([
-                'category',
+                'translations',
+                'category.translations',
                 'admin',
             ])
         );
@@ -63,9 +72,16 @@ class DocumentController extends Controller
 
         $document->update($validated);
 
+        $document->refresh();
+
+        $this->syncPortugueseTranslation($document);
+
+        TranslationDispatcher::document($document);
+
         return DocumentResource::make(
-            $document->fresh()->load([
-                'category',
+            $document->load([
+                'translations',
+                'category.translations',
                 'admin',
             ])
         );
@@ -76,5 +92,20 @@ class DocumentController extends Controller
         $document->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function syncPortugueseTranslation(Document $document): void
+    {
+        DocumentTranslation::updateOrCreate(
+            [
+                'document_id' => $document->id,
+                'locale' => DocumentTranslation::LOCALE_PT_BR,
+            ],
+            [
+                'title' => $document->title,
+                'translation_status' => DocumentTranslation::STATUS_ORIGINAL,
+                'translated_at' => null,
+            ]
+        );
     }
 }

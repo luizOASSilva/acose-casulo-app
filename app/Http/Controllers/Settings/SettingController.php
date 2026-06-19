@@ -6,19 +6,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\UpdateSettingsRequest;
 use App\Http\Resources\SettingResource;
 use App\Models\Setting;
+use App\Support\TranslationDispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SettingController extends Controller
 {
-    public function public(): JsonResponse
+    public function public(Request $request): JsonResponse
     {
+        $locale = Setting::normalizeLocale(
+            $request->query('locale') ?? $request->header('X-Locale')
+        );
+
         return response()->json([
-            'data' => Setting::publicCached(),
+            'data' => Setting::publicCached($locale),
         ]);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         return SettingResource::collection(
             Setting::adminCached()
@@ -30,18 +35,34 @@ class SettingController extends Controller
         $validated = $request->validated();
 
         foreach ($validated['settings'] as $item) {
-            Setting::query()
+            $setting = Setting::query()
                 ->where('key', $item['key'])
-                ->update([
-                    'value' => $item['value'] ?? null,
-                ]);
+                ->first();
+
+            if (! $setting) {
+                continue;
+            }
+
+            $setting->update([
+                'value' => $item['value'] ?? null,
+            ]);
+
+            $setting->refresh();
+
+            $setting->syncPortugueseTranslation();
+
+            TranslationDispatcher::setting($setting);
         }
 
         Setting::clearCache();
 
         return response()->json([
             'message' => 'Configurações atualizadas com sucesso.',
-            'data' => Setting::publicCached(),
+            'data' => Setting::publicCached(
+                Setting::normalizeLocale(
+                    $request->query('locale') ?? $request->header('X-Locale')
+                )
+            ),
         ]);
     }
 

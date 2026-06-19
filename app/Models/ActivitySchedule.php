@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ActivitySchedule extends Model
 {
-
     use HasFactory;
 
     protected $fillable = [
