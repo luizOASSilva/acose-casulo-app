@@ -31,16 +31,13 @@ echo "Preparando diretórios do Laravel..."
 
 mkdir -p storage/logs
 mkdir -p storage/app/public
-
 mkdir -p storage/app/public/media/articles
 mkdir -p storage/app/public/media/activities
 mkdir -p storage/app/public/media/partners
 mkdir -p storage/app/public/media/general
-
 mkdir -p storage/framework/cache/data
 mkdir -p storage/framework/sessions
 mkdir -p storage/framework/views
-
 mkdir -p bootstrap/cache
 mkdir -p public
 
@@ -79,7 +76,7 @@ then
 else
     echo "ERRO: www-data não consegue gravar no storage."
 
-    echo "Permissões do storage:"
+    echo "Permissões encontradas:"
     ls -la storage || true
     ls -la storage/app || true
     ls -la storage/app/public || true
@@ -195,13 +192,9 @@ run_fresh_migrations()
     while [ "${attempt}" -le "${max_attempts}" ]; do
         echo "Executando migrate:fresh — tentativa ${attempt}/${max_attempts}..."
 
-        /*
-         * Não existe --seed aqui.
-         *
-         * Os seeders são executados separadamente somente quando:
-         *
-         * RUN_SEEDERS=true
-         */
+        # O --seed não é usado aqui.
+        # Os seeders rodam separadamente apenas quando
+        # RUN_SEEDERS=true.
 
         if php artisan migrate:fresh --force -v; then
             echo "Banco apagado e recriado pelas migrations."
@@ -266,16 +259,13 @@ else
     echo "Migrations ignoradas."
 fi
 
-/*
- * O seeder é executado independentemente de ter sido usado
- * migrate ou migrate:fresh.
- *
- * Assim, é possível usar:
- *
- * RUN_FRESH_MIGRATIONS=true
- * RUN_SEEDERS=true
- * SEEDER_CLASS=Database\Seeders\DocumentCategorySeeder
- */
+# O seeder é executado separadamente.
+#
+# Para recriar o banco e rodar somente as categorias:
+#
+# RUN_FRESH_MIGRATIONS=true
+# RUN_SEEDERS=true
+# SEEDER_CLASS=Database\Seeders\DocumentCategorySeeder
 
 run_seeders
 
