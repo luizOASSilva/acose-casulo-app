@@ -9,11 +9,15 @@ use App\Models\Activity;
 use App\Models\Article;
 use App\Models\MediaFile;
 use App\Models\Partner;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class MediaLibraryController extends Controller
 {
@@ -39,69 +43,117 @@ class MediaLibraryController extends Controller
         return MediaFileResource::collection($files);
     }
 
-    public function store(StoreMediaFileRequest $request, string $collection): JsonResponse
-    {
+    public function store(
+        StoreMediaFileRequest $request,
+        string $collection
+    ): JsonResponse {
         $this->authorizeAdmin($request);
         $this->validateCollection($collection);
 
         $file = $request->file('file');
 
         abort_unless(
-            $file && $file->isValid(),
+            $file instanceof UploadedFile && $file->isValid(),
             422,
             'Arquivo inválido ou não enviado.'
         );
 
-        $extension = strtolower($file->getClientOriginalExtension());
-
-        if ($extension === '') {
-            $extension = $file->guessExtension() ?: 'bin';
-        }
-
-        $filename = $collection . '-' . Str::uuid() . '.' . $extension;
-        $directory = 'media/' . $collection;
-
         $disk = Storage::disk($this->disk);
+        $directory = 'media/'.$collection;
 
-        if (! $disk->exists($directory)) {
-            $disk->makeDirectory($directory);
-        }
+        $extension = $this->resolveExtension($file);
 
-        $path = $file->storeAs(
-            $directory,
-            $filename,
-            $this->disk
+        $filename = sprintf(
+            '%s-%s.%s',
+            $collection,
+            Str::uuid()->toString(),
+            $extension
         );
 
-        if (! is_string($path) || trim($path) === '' || $path === '0') {
+        try {
+            $this->ensureDirectoryExists(
+                disk: $disk,
+                directory: $directory
+            );
+
+            /*
+             * Usa diretamente o disco configurado.
+             * Isso evita divergências entre storeAs() e o disco utilizado.
+             */
+            $path = $disk->putFileAs(
+                $directory,
+                $file,
+                $filename,
+                [
+                    'visibility' => 'public',
+                ]
+            );
+
+            if (
+                ! is_string($path) ||
+                trim($path) === '' ||
+                $path === '0'
+            ) {
+                throw new RuntimeException(
+                    'O filesystem não retornou o caminho do arquivo salvo.'
+                );
+            }
+
+            if (! $disk->exists($path)) {
+                throw new RuntimeException(
+                    'O upload terminou, mas o arquivo não foi encontrado no storage.'
+                );
+            }
+
+            $url = $this->generatePublicUrl(
+                disk: $disk,
+                path: $path
+            );
+
+            $mediaFile = MediaFile::query()->create([
+                'collection' => $collection,
+                'disk' => $this->disk,
+                'original_name' => $file->getClientOriginalName(),
+                'filename' => $filename,
+                'path' => $path,
+                'url' => $url,
+                'mime_type' => $file->getMimeType()
+                    ?: $file->getClientMimeType(),
+                'size' => $file->getSize()
+                    ?: $disk->size($path)
+                    ?: 0,
+                'created_by' => $request->user('admin')?->id,
+            ]);
+
+            return MediaFileResource::make($mediaFile)
+                ->response()
+                ->setStatusCode(201);
+        } catch (Throwable $exception) {
+            Log::error('Falha ao enviar arquivo para a biblioteca de mídia.', [
+                'disk' => $this->disk,
+                'collection' => $collection,
+                'directory' => $directory,
+                'filename' => $filename,
+                'storage_root' => config(
+                    "filesystems.disks.{$this->disk}.root"
+                ),
+                'app_url' => config('app.url'),
+                'file_valid' => $file->isValid(),
+                'file_error' => $file->getError(),
+                'file_error_message' => $file->getErrorMessage(),
+                'temporary_path' => $file->getPathname(),
+                'temporary_file_exists' => is_file($file->getPathname()),
+                'temporary_file_readable' => is_readable(
+                    $file->getPathname()
+                ),
+                'exception' => $exception,
+            ]);
+
             throw new RuntimeException(
-                'Falha ao salvar arquivo no storage público. Verifique permissões de storage/app/public e o link public/storage.'
+                'Não foi possível salvar a imagem. Consulte os logs do servidor.',
+                previous: $exception
             );
         }
-
-        if (! $disk->exists($path)) {
-            throw new RuntimeException(
-                'O arquivo foi processado, mas não foi encontrado no storage após o upload.'
-            );
-        }
-
-        $relativeUrl = Storage::url($path);
-
-        $mediaFile = MediaFile::query()->create([
-            'collection' => $collection,
-            'disk' => $this->disk,
-            'original_name' => $file->getClientOriginalName(),
-            'filename' => $filename,
-            'path' => $path,
-            'url' => asset($relativeUrl),
-            'mime_type' => $file->getMimeType() ?: $file->getClientMimeType(),
-            'size' => $file->getSize() ?: $disk->size($path) ?: 0,
-            'created_by' => $request->user('admin')?->id,
-        ]);
-
-        return MediaFileResource::make($mediaFile)
-            ->response()
-            ->setStatusCode(201);
     }
 
     public function destroy(
@@ -126,10 +178,15 @@ class MediaLibraryController extends Controller
 
         if (
             $mediaFile->path &&
-            $mediaFile->path !== '0' &&
-            Storage::disk($mediaFile->disk)->exists($mediaFile->path)
+            $mediaFile->path !== '0'
         ) {
-            Storage::disk($mediaFile->disk)->delete($mediaFile->path);
+            $disk = Storage::disk(
+                $mediaFile->disk ?: $this->disk
+            );
+
+            if ($disk->exists($mediaFile->path)) {
+                $disk->delete($mediaFile->path);
+            }
         }
 
         $mediaFile->delete();
@@ -151,40 +208,144 @@ class MediaLibraryController extends Controller
     private function validateCollection(string $collection): void
     {
         abort_unless(
-            in_array($collection, $this->allowedCollections, true),
+            in_array(
+                $collection,
+                $this->allowedCollections,
+                true
+            ),
             422,
             'Coleção de mídia inválida.'
         );
     }
 
+    private function resolveExtension(
+        UploadedFile $file
+    ): string {
+        $extension = strtolower(
+            trim($file->getClientOriginalExtension())
+        );
+
+        if ($extension !== '') {
+            return $extension;
+        }
+
+        return strtolower(
+            $file->guessExtension() ?: 'bin'
+        );
+    }
+
+    private function ensureDirectoryExists(
+        Filesystem $disk,
+        string $directory
+    ): void {
+        if ($disk->directoryExists($directory)) {
+            return;
+        }
+
+        $created = $disk->makeDirectory($directory);
+
+        if (! $created || ! $disk->directoryExists($directory)) {
+            throw new RuntimeException(
+                "Não foi possível criar o diretório {$directory}."
+            );
+        }
+    }
+
+    private function generatePublicUrl(
+        Filesystem $disk,
+        string $path
+    ): string {
+        $url = $disk->url($path);
+
+        /*
+         * Caso algum driver retorne apenas /storage/..., monta a URL
+         * absoluta usando APP_URL do backend.
+         */
+        if (Str::startsWith($url, ['http://', 'https://'])) {
+            return $url;
+        }
+
+        $appUrl = rtrim(
+            (string) config('app.url'),
+            '/'
+        );
+
+        return $appUrl.'/'.ltrim($url, '/');
+    }
+
     private function isMediaInUse(MediaFile $mediaFile): bool
     {
-        if (! $mediaFile->path || $mediaFile->path === '0') {
+        if (
+            ! $mediaFile->path ||
+            $mediaFile->path === '0'
+        ) {
             return false;
         }
 
+        $disk = Storage::disk(
+            $mediaFile->disk ?: $this->disk
+        );
+
         $absoluteUrl = $mediaFile->url;
-        $relativeUrl = Storage::url($mediaFile->path);
+        $generatedUrl = $disk->url($mediaFile->path);
+        $relativeUrl = '/storage/'.ltrim(
+            Str::after($mediaFile->path, 'storage/'),
+            '/'
+        );
 
         return Article::query()
-            ->whereHas('publication.media', function ($query) use ($absoluteUrl, $relativeUrl) {
-                $query
-                    ->where('url', $absoluteUrl)
-                    ->orWhere('url', $relativeUrl);
-            })
+            ->whereHas(
+                'publication.media',
+                function ($query) use (
+                    $absoluteUrl,
+                    $generatedUrl,
+                    $relativeUrl
+                ) {
+                    $query->where(function ($mediaQuery) use (
+                        $absoluteUrl,
+                        $generatedUrl,
+                        $relativeUrl
+                    ) {
+                        $mediaQuery
+                            ->where('url', $absoluteUrl)
+                            ->orWhere('url', $generatedUrl)
+                            ->orWhere('url', $relativeUrl);
+                    });
+                }
+            )
             ->exists()
             || Activity::query()
-                ->whereHas('publication.media', function ($query) use ($absoluteUrl, $relativeUrl) {
-                    $query
-                        ->where('url', $absoluteUrl)
-                        ->orWhere('url', $relativeUrl);
-                })
+                ->whereHas(
+                    'publication.media',
+                    function ($query) use (
+                        $absoluteUrl,
+                        $generatedUrl,
+                        $relativeUrl
+                    ) {
+                        $query->where(function ($mediaQuery) use (
+                            $absoluteUrl,
+                            $generatedUrl,
+                            $relativeUrl
+                        ) {
+                            $mediaQuery
+                                ->where('url', $absoluteUrl)
+                                ->orWhere('url', $generatedUrl)
+                                ->orWhere('url', $relativeUrl);
+                        });
+                    }
+                )
                 ->exists()
             || Partner::query()
-                ->where(function ($query) use ($absoluteUrl, $relativeUrl, $mediaFile) {
+                ->where(function ($query) use (
+                    $absoluteUrl,
+                    $generatedUrl,
+                    $relativeUrl,
+                    $mediaFile
+                ) {
                     $query
                         ->where('logo_path', $mediaFile->path)
                         ->orWhere('logo_path', $absoluteUrl)
+                        ->orWhere('logo_path', $generatedUrl)
                         ->orWhere('logo_path', $relativeUrl);
                 })
                 ->exists();
