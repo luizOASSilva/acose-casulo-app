@@ -9,6 +9,7 @@ RUN apk add --no-cache \
         curl \
         git \
         unzip \
+        shadow \
         libzip \
         oniguruma \
         libxml2 \
@@ -44,6 +45,15 @@ RUN apk add --no-cache \
     && apk del .build-deps \
     && rm -rf /var/cache/apk/* /tmp/*
 
+# Os Secret Files do Render são legíveis pelo grupo de GID 1000.
+# Cria o grupo caso ele ainda não exista e adiciona www-data a ele.
+RUN if ! awk -F: '$3 == 1000 { found = 1 } END { exit(found ? 0 : 1) }' /etc/group; then \
+        groupadd --gid 1000 render-secrets; \
+    fi \
+    && RENDER_SECRETS_GROUP="$(awk -F: '$3 == 1000 { print $1; exit }' /etc/group)" \
+    && usermod -a -G "${RENDER_SECRETS_GROUP}" www-data \
+    && id www-data
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 RUN { \
@@ -65,11 +75,12 @@ RUN { \
         echo 'opcache.save_comments=1'; \
     } > /usr/local/etc/php/conf.d/production.ini
 
-# Mantém as variáveis do Render disponíveis para o PHP-FPM.
+# Mantém as variáveis do Render disponíveis para os workers do PHP-FPM.
 RUN { \
         echo '[www]'; \
         echo 'clear_env = no'; \
         echo 'catch_workers_output = yes'; \
+        echo 'pm = dynamic'; \
         echo 'pm.max_children = 5'; \
         echo 'pm.start_servers = 2'; \
         echo 'pm.min_spare_servers = 1'; \
@@ -78,7 +89,8 @@ RUN { \
 
 WORKDIR /var/www/html
 
-# Instala dependências antes de copiar o projeto inteiro para aproveitar cache.
+# Instala as dependências antes de copiar o projeto inteiro,
+# permitindo melhor aproveitamento do cache do Docker.
 COPY composer.json composer.lock ./
 
 RUN composer install \
@@ -99,12 +111,20 @@ RUN composer dump-autoload \
     && mkdir -p \
         storage/logs \
         storage/app/public \
+        storage/app/public/media/articles \
+        storage/app/public/media/activities \
+        storage/app/public/media/partners \
+        storage/app/public/media/general \
         storage/framework/cache/data \
         storage/framework/sessions \
         storage/framework/views \
         bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+    && chown -R www-data:www-data \
+        storage \
+        bootstrap/cache \
+    && chmod -R 775 \
+        storage \
+        bootstrap/cache
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/start.sh /start.sh

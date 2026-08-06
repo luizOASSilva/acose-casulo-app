@@ -11,6 +11,7 @@ echo "RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}"
 echo "RUN_SEEDERS=${RUN_SEEDERS:-false}"
 echo "RUN_FRESH_MIGRATIONS=${RUN_FRESH_MIGRATIONS:-false}"
 echo "PORT=${PORT:-10000}"
+echo "GOOGLE_ANALYTICS_AUTH_MODE=${GOOGLE_ANALYTICS_AUTH_MODE:-}"
 echo "======================================"
 
 cd /var/www/html
@@ -32,11 +33,12 @@ mkdir -p public
 echo "Criando link público do storage..."
 
 rm -rf public/storage
+
 ln -sfn \
     /var/www/html/storage/app/public \
     /var/www/html/public/storage
 
-echo "Ajustando permissões..."
+echo "Ajustando permissões do Laravel..."
 
 chown -R www-data:www-data \
     storage \
@@ -51,7 +53,7 @@ echo "Enviando logs do Laravel para stderr..."
 rm -f storage/logs/laravel.log
 ln -s /dev/stderr storage/logs/laravel.log
 
-echo "Testando gravação como www-data..."
+echo "Testando gravação no storage como www-data..."
 
 su -s /bin/sh www-data -c \
     "touch /var/www/html/storage/app/public/media/general/.write-test"
@@ -65,6 +67,51 @@ echo "Verificando link público..."
 
 ls -la public/storage
 readlink -f public/storage || true
+
+echo "Verificando grupos do usuário www-data..."
+
+id www-data
+
+GOOGLE_ANALYTICS_AUTH_MODE_NORMALIZED="$(
+    printf '%s' "${GOOGLE_ANALYTICS_AUTH_MODE:-}" |
+        tr '[:upper:]' '[:lower:]'
+)"
+
+if [ "$GOOGLE_ANALYTICS_AUTH_MODE_NORMALIZED" = "service_account" ]; then
+    GOOGLE_ANALYTICS_SECRET_PATH="${GOOGLE_ANALYTICS_CREDENTIALS_PATH:-/etc/secrets/google-analytics-service-account.json}"
+
+    echo "Verificando Secret File do Google Analytics..."
+    echo "Caminho configurado: ${GOOGLE_ANALYTICS_SECRET_PATH}"
+
+    if [ ! -f "$GOOGLE_ANALYTICS_SECRET_PATH" ]; then
+        echo "ERRO: o Secret File do Google Analytics não foi encontrado."
+        echo "Esperado em: ${GOOGLE_ANALYTICS_SECRET_PATH}"
+        echo "Arquivos disponíveis em /etc/secrets:"
+
+        ls -la /etc/secrets 2>/dev/null || true
+
+        exit 1
+    fi
+
+    if ! su -s /bin/sh www-data -c \
+        "test -r \"${GOOGLE_ANALYTICS_SECRET_PATH}\""
+    then
+        echo "ERRO: o usuário www-data não consegue ler o Secret File."
+        echo "Arquivo: ${GOOGLE_ANALYTICS_SECRET_PATH}"
+        echo "Permissões encontradas:"
+
+        ls -la "$GOOGLE_ANALYTICS_SECRET_PATH" || true
+
+        echo "Grupos do www-data:"
+        id www-data || true
+
+        exit 1
+    fi
+
+    echo "Secret File do Google Analytics encontrado e legível."
+else
+    echo "Validação de Service Account ignorada."
+fi
 
 echo "Preparando configuração do Nginx..."
 
@@ -188,7 +235,11 @@ php-fpm -D
 echo "Verificando processo do PHP-FPM..."
 
 sleep 1
-pgrep php-fpm > /dev/null
+
+if ! pgrep php-fpm > /dev/null; then
+    echo "ERRO: PHP-FPM não permaneceu em execução."
+    exit 1
+fi
 
 echo "Iniciando Nginx na porta ${PORT}..."
 echo "Container iniciado."
