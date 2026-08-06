@@ -114,16 +114,6 @@ class SettingsSeeder extends Seeder
             ],
             [
                 'group' => 'social',
-                'key' => 'youtube_url',
-                'label' => 'YouTube',
-                'description' => 'URL do canal ou perfil no YouTube.',
-                'type' => 'url',
-                'value' => '',
-                'is_public' => true,
-                'sort_order' => 22,
-            ],
-            [
-                'group' => 'social',
                 'key' => 'instagram_url',
                 'label' => 'Instagram',
                 'description' => 'URL do perfil no Instagram.',
@@ -131,6 +121,16 @@ class SettingsSeeder extends Seeder
                 'value' => '',
                 'is_public' => true,
                 'sort_order' => 21,
+            ],
+            [
+                'group' => 'social',
+                'key' => 'youtube_url',
+                'label' => 'YouTube',
+                'description' => 'URL do canal ou perfil no YouTube.',
+                'type' => 'url',
+                'value' => '',
+                'is_public' => true,
+                'sort_order' => 22,
             ],
 
             [
@@ -156,9 +156,19 @@ class SettingsSeeder extends Seeder
         ];
 
         foreach ($settings as $setting) {
-            Setting::updateOrCreate(
-                ['key' => $setting['key']],
-                $setting
+            Setting::query()->firstOrCreate(
+                [
+                    'key' => $setting['key'],
+                ],
+                [
+                    'group' => $setting['group'],
+                    'label' => $setting['label'],
+                    'description' => $setting['description'],
+                    'type' => $setting['type'],
+                    'value' => $setting['value'],
+                    'is_public' => $setting['is_public'],
+                    'sort_order' => $setting['sort_order'],
+                ]
             );
         }
 

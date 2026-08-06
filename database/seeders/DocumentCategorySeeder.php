@@ -49,9 +49,15 @@ class DocumentCategorySeeder extends Seeder
         ];
 
         foreach ($categories as $category) {
-            DocumentCategory::updateOrCreate(
-                ['name' => $category['name']],
-                $category
+            DocumentCategory::query()->firstOrCreate(
+                [
+                    'name' => $category['name'],
+                ],
+                [
+                    'description' => $category['description'],
+                    'featured' => $category['featured'],
+                    'order' => $category['order'],
+                ]
             );
         }
     }
