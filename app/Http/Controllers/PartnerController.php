@@ -6,8 +6,6 @@ use App\Http\Requests\Partner\StorePartnerRequest;
 use App\Http\Requests\Partner\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
 use App\Models\Partner;
-use App\Models\PartnerTranslation;
-use App\Support\TranslationDispatcher;
 use Illuminate\Http\Request;
 
 class PartnerController extends Controller
@@ -15,10 +13,7 @@ class PartnerController extends Controller
     public function index(Request $request)
     {
         $query = Partner::query()
-            ->with([
-                'admin',
-                'translations',
-            ])
+            ->with('admin')
             ->orderBy('order')
             ->orderBy('name');
 
@@ -28,10 +23,7 @@ class PartnerController extends Controller
             $query->where(function ($partnerQuery) use ($search) {
                 $partnerQuery
                     ->where('name', 'like', "%{$search}%")
-                    ->orWhere('logo_alt', 'like', "%{$search}%")
-                    ->orWhereHas('translations', function ($translationQuery) use ($search) {
-                        $translationQuery->where('logo_alt', 'like', "%{$search}%");
-                    });
+                    ->orWhere('logo_alt', 'like', "%{$search}%");
             });
         }
 
@@ -44,14 +36,18 @@ class PartnerController extends Controller
         }
 
         if ($request->boolean('all')) {
-            return PartnerResource::collection($query->get());
+            return PartnerResource::collection(
+                $query->get()
+            );
         }
 
         $perPage = (int) $request->input('per_page', 12);
         $perPage = max(1, min($perPage, 48));
 
         return PartnerResource::collection(
-            $query->paginate($perPage)->withQueryString()
+            $query
+                ->paginate($perPage)
+                ->withQueryString()
         );
     }
 
@@ -59,7 +55,6 @@ class PartnerController extends Controller
     {
         return PartnerResource::collection(
             Partner::query()
-                ->with('translations')
                 ->where('is_active', true)
                 ->orderBy('order')
                 ->orderBy('name')
@@ -71,39 +66,38 @@ class PartnerController extends Controller
     {
         $validated = $request->validated();
 
-        $adminId = $request->user('admin')?->id ?? $request->user()?->id;
+        $adminId = $request->user('admin')?->id
+            ?? $request->user()?->id;
 
-        abort_unless($adminId, 403, 'Administrador não autenticado.');
+        abort_unless(
+            $adminId,
+            403,
+            'Administrador não autenticado.'
+        );
 
         $partner = Partner::create([
             ...$validated,
             'admin_id' => $adminId,
         ]);
 
-        $this->syncPortugueseTranslation($partner);
-
-        TranslationDispatcher::partner($partner);
-
         return PartnerResource::make(
-            $partner->fresh([
-                'admin',
-                'translations',
-            ])
-        )->response()->setStatusCode(201);
+            $partner->fresh('admin')
+        )
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Partner $partner)
     {
         return PartnerResource::make(
-            $partner->load([
-                'admin',
-                'translations',
-            ])
+            $partner->load('admin')
         );
     }
 
-    public function update(UpdatePartnerRequest $request, Partner $partner)
-    {
+    public function update(
+        UpdatePartnerRequest $request,
+        Partner $partner
+    ) {
         $validated = $request->validated();
 
         unset($validated['admin_id']);
@@ -112,15 +106,8 @@ class PartnerController extends Controller
 
         $partner->refresh();
 
-        $this->syncPortugueseTranslation($partner);
-
-        TranslationDispatcher::partner($partner);
-
         return PartnerResource::make(
-            $partner->load([
-                'admin',
-                'translations',
-            ])
+            $partner->load('admin')
         );
     }
 
@@ -129,20 +116,5 @@ class PartnerController extends Controller
         $partner->delete();
 
         return response()->json(null, 204);
-    }
-
-    private function syncPortugueseTranslation(Partner $partner): void
-    {
-        PartnerTranslation::updateOrCreate(
-            [
-                'partner_id' => $partner->id,
-                'locale' => PartnerTranslation::LOCALE_PT_BR,
-            ],
-            [
-                'logo_alt' => $partner->logo_alt,
-                'translation_status' => PartnerTranslation::STATUS_ORIGINAL,
-                'translated_at' => null,
-            ]
-        );
     }
 }

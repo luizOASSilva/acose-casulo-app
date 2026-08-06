@@ -31,13 +31,9 @@ class TransparencyController extends Controller
 
         $categories = DocumentCategory::query()
             ->with([
-                'translations',
                 'documents' => fn ($query) => $query
                     ->where('year', $year)
-                    ->with([
-                        'translations',
-                        'category.translations',
-                    ])
+                    ->with('category')
                     ->orderBy('title'),
             ])
             ->orderBy('order')
@@ -50,7 +46,10 @@ class TransparencyController extends Controller
 
                 return $category;
             })
-            ->filter(fn (DocumentCategory $category) => $category->documents->isNotEmpty())
+            ->filter(
+                fn (DocumentCategory $category) =>
+                    $category->documents->isNotEmpty()
+            )
             ->values();
 
         $featured = $categories->firstWhere('featured', true);
@@ -58,10 +57,14 @@ class TransparencyController extends Controller
         return response()->json([
             'year' => $year,
             'years' => $years,
-            'categories' => DocumentCategoryResource::collection($categories)
-                ->resolve($request),
+
+            'categories' => DocumentCategoryResource::collection(
+                $categories
+            )->resolve($request),
+
             'featured' => $featured
-                ? DocumentCategoryResource::make($featured)->resolve($request)
+                ? DocumentCategoryResource::make($featured)
+                    ->resolve($request)
                 : null,
         ]);
     }

@@ -6,8 +6,6 @@ use App\Http\Requests\Document\StoreDocumentRequest;
 use App\Http\Requests\Document\UpdateDocumentRequest;
 use App\Http\Resources\DocumentResource;
 use App\Models\Document;
-use App\Models\DocumentTranslation;
-use App\Support\TranslationDispatcher;
 
 class DocumentController extends Controller
 {
@@ -15,12 +13,17 @@ class DocumentController extends Controller
     {
         $documents = Document::query()
             ->with([
-                'translations',
-                'category.translations',
+                'category',
                 'admin',
             ])
-            ->when(request('year'), fn ($query, $year) => $query->where('year', $year))
-            ->when(request('category_id'), fn ($query, $id) => $query->where('category_id', $id))
+            ->when(
+                request('year'),
+                fn ($query, $year) => $query->where('year', $year)
+            )
+            ->when(
+                request('category_id'),
+                fn ($query, $id) => $query->where('category_id', $id)
+            )
             ->latest()
             ->paginate();
 
@@ -31,41 +34,44 @@ class DocumentController extends Controller
     {
         $validated = $request->validated();
 
-        $adminId = $request->user('admin')?->id ?? $request->user()?->id;
+        $adminId = $request->user('admin')?->id
+            ?? $request->user()?->id;
 
-        abort_unless($adminId, 403, 'Administrador não autenticado.');
+        abort_unless(
+            $adminId,
+            403,
+            'Administrador não autenticado.'
+        );
 
         $document = Document::query()->create([
             ...$validated,
             'admin_id' => $adminId,
         ]);
 
-        $this->syncPortugueseTranslation($document);
-
-        TranslationDispatcher::document($document);
-
         return DocumentResource::make(
             $document->fresh()->load([
-                'translations',
-                'category.translations',
+                'category',
                 'admin',
             ])
-        )->response()->setStatusCode(201);
+        )
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Document $document)
     {
         return DocumentResource::make(
             $document->load([
-                'translations',
-                'category.translations',
+                'category',
                 'admin',
             ])
         );
     }
 
-    public function update(UpdateDocumentRequest $request, Document $document)
-    {
+    public function update(
+        UpdateDocumentRequest $request,
+        Document $document
+    ) {
         $validated = $request->validated();
 
         unset($validated['admin_id']);
@@ -74,14 +80,9 @@ class DocumentController extends Controller
 
         $document->refresh();
 
-        $this->syncPortugueseTranslation($document);
-
-        TranslationDispatcher::document($document);
-
         return DocumentResource::make(
             $document->load([
-                'translations',
-                'category.translations',
+                'category',
                 'admin',
             ])
         );
@@ -92,20 +93,5 @@ class DocumentController extends Controller
         $document->delete();
 
         return response()->json(null, 204);
-    }
-
-    private function syncPortugueseTranslation(Document $document): void
-    {
-        DocumentTranslation::updateOrCreate(
-            [
-                'document_id' => $document->id,
-                'locale' => DocumentTranslation::LOCALE_PT_BR,
-            ],
-            [
-                'title' => $document->title,
-                'translation_status' => DocumentTranslation::STATUS_ORIGINAL,
-                'translated_at' => null,
-            ]
-        );
     }
 }

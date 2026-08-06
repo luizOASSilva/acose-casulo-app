@@ -19,10 +19,9 @@ class Article extends Model
     public function resolveRouteBinding($value, $field = null): ?self
     {
         $query = $this->with([
-            'publication.media.translations',
+            'publication.media',
             'publication.admin',
-            'publication.translations',
-            'keywords.translations',
+            'keywords',
         ]);
 
         if (is_numeric($value)) {
@@ -30,12 +29,12 @@ class Article extends Model
         }
 
         return $query
-            ->whereHas('publication', function ($publicationQuery) use ($value) {
-                $publicationQuery->where('slug', $value);
-            })
-            ->orWhereHas('publication.translations', function ($translationQuery) use ($value) {
-                $translationQuery->where('slug', $value);
-            })
+            ->whereHas(
+                'publication',
+                function ($publicationQuery) use ($value) {
+                    $publicationQuery->where('slug', $value);
+                }
+            )
             ->firstOrFail();
     }
 
