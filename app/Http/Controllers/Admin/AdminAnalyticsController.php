@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin;
 use App\Services\GoogleAnalyticsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +16,7 @@ class AdminAnalyticsController extends Controller
         $this->ensureAuthenticatedAdmin();
 
         $days = (int) $request->integer('days', 30);
+        $days = max(1, min($days, 365));
 
         return response()->json(
             $analytics->fullReport($days)
@@ -27,8 +27,8 @@ class AdminAnalyticsController extends Controller
     {
         abort_unless(
             auth('admin')->check(),
-            403
+            403,
+            'Administrador não autenticado.'
         );
     }
 }
-
