@@ -37,11 +37,18 @@ class GoogleAnalyticsService
 
         $this->property = 'properties/'.$propertyId;
 
-        $this->credentialsPath = base_path(
+        $configuredCredentialsPath = trim(
             (string) config(
                 'google-analytics.credentials_path'
             )
         );
+
+        $this->credentialsPath = str_starts_with(
+            $configuredCredentialsPath,
+            DIRECTORY_SEPARATOR
+        )
+            ? $configuredCredentialsPath
+            : base_path($configuredCredentialsPath);
 
         $this->cacheSeconds = max(
             0,
